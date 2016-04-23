@@ -4,6 +4,7 @@
   "description": "Catbee web components renderer",
   "main": "index.js",
   "scripts": {
+    "lint": "eslint lib/* browser/*",
     "test": "lab"
   },
   "repository": {
