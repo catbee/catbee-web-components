@@ -1,7 +1,11 @@
-var DocumentRendererBase = require('../lib/base/DocumentRendererBase');
+class DocumentRenderer {
+  initWithState () {
 
-class DocumentRenderer extends DocumentRendererBase {
+  }
 
+  updateState () {
+
+  }
 }
 
 module.exports = DocumentRenderer;

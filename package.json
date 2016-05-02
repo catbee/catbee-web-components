@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint lib/* browser/*",
-    "test": "lab"
+    "test": "lab --timeout 1000"
   },
   "repository": {
     "type": "git",
@@ -20,5 +20,16 @@
   "bugs": {
     "url": "https://github.com/catbee/catbee-web-components/issues"
   },
-  "homepage": "https://github.com/catbee/catbee-web-components#readme"
+  "homepage": "https://github.com/catbee/catbee-web-components#readme",
+  "dependencies": {
+    "appstate": "catbee/appstate#dev",
+    "baobab": "^2.3.3",
+    "entities": "^1.1.1",
+    "morphdom": "^1.3.0"
+  },
+  "devDependencies": {
+    "catberry-locator": "^2.1.0",
+    "catberry-uri": "^3.1.0",
+    "lab": "^10.3.2"
+  }
 }
