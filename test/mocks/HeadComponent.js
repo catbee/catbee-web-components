@@ -4,4 +4,6 @@ class HeadMock {
   }
 }
 
-module.exports = HeadMock;
+module.exports = {
+  constructor: HeadMock
+};
