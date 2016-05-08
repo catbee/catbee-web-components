@@ -613,7 +613,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render debug info', function (done) {
+    lab.test('should properly render debug info', (done) => {
       class Document {
         template () {
           return `
@@ -661,7 +661,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should set code 200 and required headers', function (done) {
+    lab.test('should set code 200 and required headers', (done) => {
       class Document {
         template () {
           return `
@@ -703,7 +703,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should set code 302 and Location if redirect in HEAD', function (done) {
+    lab.test('should set code 302 and Location if redirect in HEAD', (done) => {
       class Document {
         template () {
           return `
@@ -755,7 +755,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should set header if set cookie in HEAD', function (done) {
+    lab.test('should set header if set cookie in HEAD', (done) => {
       class Document {
         template () {
           return `
@@ -815,7 +815,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should pass to the next middleware if notFound()', function (done) {
+    lab.test('should pass to the next middleware if notFound()', (done) => {
       class Document {
         template () {
           return `
@@ -866,6 +866,195 @@ lab.experiment('lib/DocumentRenderer', () => {
           assert.fail('Should not finish the response');
         });
     });
+
+    lab.test('should render inline script if clearFragment() in HEAD', (done) => {
+      class Document {
+        template () {
+          return `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
+            <body>
+            </body>
+            </html>
+          `
+        }
+      }
+
+      class Head {
+        render () {
+          this.$context.clearFragment();
+        }
+      }
+
+      var head = {
+        constructor: Head
+      };
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: head
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var response = routingContext.middleware.response;
+
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      documentRenderer.render(routingContext);
+
+      var expected = `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
+            <body><script>fragment</script>
+            </body>
+            </html>
+          `;
+
+      response
+        .on('error', done)
+        .on('finish', function () {
+          assert.strictEqual(response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('should render inline script if redirect()', (done) => {
+      class Document {
+        template () {
+          return `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
+            <body>
+            <cat-redirect id="redirect"></cat-redirect>
+            </body>
+            </html>
+          `
+        }
+      }
+
+      class Redirect {
+        render () {
+          this.$context.redirect('/')
+        }
+      }
+
+      var redirect = {
+        constructor: Redirect
+      };
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'redirect',
+            component: redirect
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var response = routingContext.middleware.response;
+
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      documentRenderer.render(routingContext);
+
+      var expected = `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
+            <body>
+            <cat-redirect id="redirect"><script>redirect</script></cat-redirect>
+            </body>
+            </html>
+          `;
+
+      response
+        .on('error', done)
+        .on('finish', function () {
+          assert.strictEqual(response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('should render inline script if cookie.set()', (done) => {
+      class Document {
+        template () {
+          return `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
+            <body>
+            <cat-cookie id="cookie"></cat-cookie>
+            </body>
+            </html>
+          `
+        }
+      }
+
+      class Cookie {
+        render () {
+          this.$context.cookie.set({
+            key: 'first',
+            value: 'value1'
+          });
+        }
+      }
+
+      var cookie = {
+        constructor: Cookie
+      };
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'cookie',
+            component: cookie
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var response = routingContext.middleware.response;
+
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      documentRenderer.render(routingContext);
+
+      var expected = `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
+            <body>
+            <cat-cookie id="cookie"><script>setCookie</script></cat-cookie>
+            </body>
+            </html>
+          `;
+
+      response
+        .on('error', done)
+        .on('finish', function () {
+          assert.strictEqual(response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
   });
 });
 
@@ -897,6 +1086,10 @@ function createRoutingContext(documentDescriptor, args = {}, config = {}) {
       context.actions.isNotFoundCalled = true;
       return Promise.resolve();
     },
+    clearFragment: function () {
+      this.actions.isFragmentCleared = true;
+      return Promise.resolve();
+    },
     cookie: {
       setCookie: [],
       set: function ({ key, value }) {
@@ -904,7 +1097,21 @@ function createRoutingContext(documentDescriptor, args = {}, config = {}) {
       }
     },
     getInlineScript () {
-      return '';
+      var script = '';
+
+      if (context.actions.isFragmentCleared) {
+        script += '<script>fragment</script>';
+      }
+
+      if (context.actions.redirectedTo) {
+        script += '<script>redirect</script>'
+      }
+
+      if (context.cookie.setCookie.length > 0) {
+        script += '<script>setCookie</script>'
+      }
+
+      return script;
     },
     referrer: new URI(),
     location: new URI(),
