@@ -9,6 +9,8 @@ const WARN_SAME_ID = 'The duplicated ID "%s" has been found, skipping component 
 const ERROR_CREATE_WRONG_ARGUMENTS = 'Tag name should be a string and attributes should be an object';
 const ERROR_CREATE_WRONG_NAME = 'Component for tag "%s" not found';
 const ERROR_CREATE_WRONG_ID = 'The ID is not specified or already used';
+const ERROR_MISSED_REQUIRED_COMPONENTS = 'Document component is not register.';
+const ERROR_MISSED_REQUIRED_DESCRIPTOR_FIELDS = 'Name and constructor must be passed to descriptor';
 
 const SPECIAL_IDS = {
   $$head: '$$head',
@@ -59,46 +61,43 @@ class DocumentRenderer {
     this._componentBindings = Object.create(null);
     this._currentChangedWatchers = Object.create(null);
     this._currentWatchersSet = Object.create(null);
+    this._localContext = Object.create(null);
 
     this._state = null;
     this._currentRoutingContext = null;
     this._isUpdating = false;
 
+    this._locator = locator;
     this._eventBus = locator.resolve('eventBus');
     this._window = locator.resolve('window');
     this._config = locator.resolve('config');
 
-    this._eventBus.on('watcherChanged', watcherName => {
-      this._currentChangedWatchers[watcherName] = true;
-
-      // We must wait next tick, before we run update.
-      // It's allow collect all sync updates events
-      Promise.resolve()
-        .then(() => this._updateWatchedComponents());
-    });
+    this._documentComponent = this._loadDocumentComponent();
   }
 
   /**
    * Sets the initial state of the application.
-   * @param {Object} routingContext Routing context.
+   * @param {Object} [routingContext={}] Routing context.
    * @returns {Promise} Promise for nothing.
    */
-  initWithState (routingContext) {
+  initWithState (routingContext = {}) {
+    this._currentRoutingContext = routingContext;
+
     return Promise.resolve()
       .then(() => {
-        this._currentRoutingContext = routingContext;
-
         this._state = new State(this._locator);
-        return this._state.signal(routingContext.args.signal, routingContext, routingContext.args);
+        var args = this._currentRoutingContext.args;
+
+        if (!args.signal) {
+          return;
+        }
+
+        return this._state.signal(args.signal, routingContext, routingContext.args);
       })
-      .then(() => {
-        var elements = this._findComponents(this._window.document.body, true);
-
-        elements.unshift(this._window.document.head);
-        elements.unshift(this._window.document.documentElement);
-
-        return this._initialWrap(elements);
-      });
+      .then(() => this._initialWrap({
+        element: this._window.document.documentElement,
+        parent: false
+      }));
   }
 
   /**
@@ -564,25 +563,23 @@ class DocumentRenderer {
 
   /**
    * Checks if the element is a component.
-   * @param {Object} components Current components.
    * @param {Element} element DOM element.
    * @returns {Boolean}
    * @private
    */
-  _isComponent (components, element) {
+  _isComponent (element) {
     var currentNodeName = element.nodeName;
-    return moduleHelper.COMPONENT_PREFIX_REGEXP.test(currentNodeName) &&
-      (moduleHelper.getOriginalComponentName(currentNodeName) in components);
+    return moduleHelper.COMPONENT_PREFIX_REGEXP.test(currentNodeName);
   }
 
   /**
    * Finds all descendant components of specified component element.
    * @param {Element} element Root component HTML element to begin search with.
-   * @param {boolean} goInComponents Go inside nested components.
+   * @param {String} parent component name
    * @returns {Array}
    * @private
    */
-  _findComponents (element, goInComponents) {
+  _findComponents (element, parent) {
     var elements = [];
     var queue = [element];
     var currentChildren, i;
@@ -596,15 +593,15 @@ class DocumentRenderer {
         }
 
         // and they should be components
-        if (!this._isComponent(components, currentChildren[i])) {
+        if (!this._isComponent(currentChildren[i])) {
           queue.push(currentChildren[i]);
           continue;
         }
 
-        if (goInComponents) {
-          queue.push(currentChildren[i]);
-        }
-        elements.push(currentChildren[i]);
+        elements.push({
+          element: currentChildren[i],
+          parent: parent
+        });
       }
     }
 
@@ -805,33 +802,47 @@ class DocumentRenderer {
 
   /**
    * Does initial wrapping for every component on the page.
-   * @param {Array} elements Elements list.
+   * @param {Object} element Elements list.
+   * @param {String} parent
    * @return {Promise}
    * @private
    */
-  _initialWrap (elements) {
-    var current = elements.pop();
-
+  _initialWrap ({ element, parent }) {
     return Promise.resolve()
       .then(() => {
-        var id = this._getId(current);
+        var id = this._getId(element);
 
         if (!id) {
           return Promise.resolve();
         }
 
-        var componentName = moduleHelper.getOriginalComponentName(current.nodeName);
-        if (!(componentName in components)) {
+        var componentName = moduleHelper.getOriginalComponentName(element.nodeName);
+
+        if (moduleHelper.isDocumentComponent(componentName) && !this._documentComponent) {
           return Promise.resolve();
         }
 
-        var constructor = components[componentName].constructor;
-        var context = this._getComponentContext(components[componentName], current);
+        // Recursive local context extends
+        if (moduleHelper.isDocumentComponent(componentName)) {
+          this._localContext[componentName] = this._documentComponent;
+        } else {
+          var component = this._localContext[parent].children.find((child) => child.name === componentName);
+          this._localContext[componentName] = this._generateLocalContext(component);
+        }
+
+        var localContext = this._localContext[componentName];
+
+        if (!localContext) {
+          return Promise.resolve();
+        }
+
+        var constructor = localContext.constructor;
+        var context = this._getComponentContext(localContext, element);
         constructor.prototype.$context = context;
         var instance = new constructor(this._locator);
         instance.$context = constructor.prototype.$context;
 
-        this._componentElements[id] = current;
+        this._componentElements[id] = element;
         this._componentInstances[id] = instance;
 
         this._eventBus.emit('componentRendered', {
@@ -840,22 +851,40 @@ class DocumentRenderer {
           context: instance.$context
         });
 
-        return this._bindComponent(current)
+        return this._bindComponent(element)
           .then(() => {
             if (!context.watcher) {
               return Promise.resolve();
             }
 
             return this._bindWatcher(id, context.watcher);
-          });
+          })
+          .then(() => this._findComponents(element, componentName));
       })
-      .then(() => {
-        if (elements.length > 0) {
-          return this._initialWrap(components, elements);
+      .then((components) => {
+        if (!components.length) {
+          return;
         }
 
-        this._eventBus.emit('documentRendered', this._currentRoutingContext);
+        return Promise.all(components.map((component) => this._initialWrap(component)));
       });
+  }
+
+  /**
+   * Generate local component context
+   * @private
+   */
+  _generateLocalContext (context = {}) {
+    if (!context.constructor || !context.name) {
+      this._eventBus.emit('error', new Error(ERROR_MISSED_REQUIRED_DESCRIPTOR_FIELDS));
+      return;
+    }
+
+    return {
+      name: context.name,
+      constructor: context.component.constructor,
+      children: context.component.children || []
+    };
   }
 
   /**
@@ -1052,6 +1081,22 @@ class DocumentRenderer {
 
     watcher.off('update');
     delete this._currentChangedWatchers[id];
+  }
+
+  /**
+   * Загружаем компонент документа
+   * @returns {Object|void}
+   * @private
+   */
+  _loadDocumentComponent () {
+    var document = this._locator.resolve('documentComponent');
+
+    if (!document) {
+      this._eventBus.emit('error', ERROR_MISSED_REQUIRED_COMPONENTS);
+      return;
+    }
+
+    return document;
   }
 }
 
