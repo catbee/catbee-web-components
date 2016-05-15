@@ -128,17 +128,18 @@ class DocumentRenderer {
   /**
    * Renders component into HTML element.
    * @param {Element} element HTML element of component
+   * @param {Object?} componentContext Component descriptor
+   * @param {Boolean?} isRoot
    * @param {Object?} renderingContext Rendering context for group rendering.
    * @returns {Promise}
    */
-  renderComponent (element, renderingContext) {
-    return this._getPromiseForReadyState()
+  renderComponent (element, componentContext, isRoot, renderingContext) {
+    return Promise.resolve()
       .then(() => {
         var componentName = moduleHelper.getOriginalComponentName(element.tagName);
-
         var id = this._getId(element);
+
         if (!id) {
-          this._logger.warn(util.format(WARN_ID_NOT_SPECIFIED, componentName));
           return Promise.resolve();
         }
 
@@ -148,7 +149,6 @@ class DocumentRenderer {
         }
 
         var hadChildren = element.hasChildNodes();
-        var component = renderingContext.components[componentName];
         var instance = this._componentInstances[id];
 
         if (!component) {
@@ -156,7 +156,6 @@ class DocumentRenderer {
         }
 
         if (id in renderingContext.renderedIds) {
-          this._logger.warn(util.format(WARN_SAME_ID, id, componentName));
           return Promise.resolve();
         }
 
@@ -164,7 +163,7 @@ class DocumentRenderer {
 
         if (!instance) {
           component.constructor.prototype.$context = this._getComponentContext(component, element);
-          instance = this._serviceLocator.resolveInstance(component.constructor, renderingContext.config);
+          instance = new component.constructor(this._locator);
           instance.$context = component.constructor.prototype.$context;
           this._componentInstances[id] = instance;
         }
@@ -176,7 +175,6 @@ class DocumentRenderer {
 
         this._componentElements[id] = element;
 
-        var startTime = hrTimeHelper.get();
         this._eventBus.emit('componentRender', eventArgs);
 
         return Promise.resolve()
@@ -197,7 +195,7 @@ class DocumentRenderer {
             var renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
             return moduleHelper.getSafePromise(renderMethod);
           })
-          .then(dataContext => component.template.render(dataContext))
+          .then(dataContext => instance.template(dataContext))
           .catch(reason => this._handleRenderError(element, component, reason))
           .then(html => {
             var isHead = element.tagName === TAG_NAMES.HEAD;
@@ -213,23 +211,21 @@ class DocumentRenderer {
             }
 
             morphdom(element, tmpElement, {
-              onBeforeMorphElChildren: foundElement => {
-                return foundElement === element ||
-                  !this._isComponent(
-                    renderingContext.components,
-                    foundElement
-                  );
-              }
+              onBeforeMorphElChildren: (foundElement) => foundElement === element || !this._isComponent(foundElement)
             });
 
-            var promises = this._findComponents(element, renderingContext.components, false)
-              .map(innerComponent => this.renderComponent(innerComponent, renderingContext));
+            var promises = this._findComponents(element, componentName)
+              .map(innerComponent => {
+                let innerComponentName = moduleHelper.getOriginalComponentName(innerComponent.element.tagName);
+                let innerComponentDescriptor = this._localContext[innerComponent.parent].children.find((child) => child.name === innerComponentName);
+
+
+                return this.renderComponent(innerComponent.element, this._localContext[innerComponentName], renderingContext);
+              });
 
             return Promise.all(promises);
           })
           .then(() => {
-            eventArgs.hrTime = hrTimeHelper.get(startTime);
-            eventArgs.time = hrTimeHelper.toMilliseconds(eventArgs.hrTime);
             this._eventBus.emit('componentRendered', eventArgs);
             return this._bindComponent(element)
               .then(() => {
@@ -307,25 +303,25 @@ class DocumentRenderer {
   /**
    * Creates and renders component element.
    * @param {string} tagName Name of HTML tag.
+   * @param {Object} descriptor
    * @param {Object} attributes Element attributes.
    * @returns {Promise<Element>} Promise for HTML element with rendered component.
    */
-  createComponent (tagName, attributes) {
-    if (typeof (tagName) !== 'string' || !attributes ||
+  createComponent (tagName, descriptor, attributes) {
+    if (!descriptor || typeof descriptor !== 'object' ||
+      typeof (tagName) !== 'string' || !attributes ||
       typeof (attributes) !== 'object') {
       return Promise.reject(
         new Error(ERROR_CREATE_WRONG_ARGUMENTS)
       );
     }
 
-    return this._getPromiseForReadyState()
+    return Promise.resolve()
       .then(() => {
-        var components = this._componentLoader.getComponentsByNames();
         var componentName = moduleHelper.getOriginalComponentName(tagName);
 
         if (moduleHelper.isHeadComponent(componentName) ||
-          moduleHelper.isDocumentComponent(componentName) ||
-          !(componentName in components)) {
+          moduleHelper.isDocumentComponent(componentName)) {
           return Promise.reject(
             new Error(util.format(ERROR_CREATE_WRONG_NAME, tagName))
           );
@@ -569,7 +565,8 @@ class DocumentRenderer {
    */
   _isComponent (element) {
     var currentNodeName = element.nodeName;
-    return moduleHelper.COMPONENT_PREFIX_REGEXP.test(currentNodeName);
+    return moduleHelper.COMPONENT_PREFIX_REGEXP.test(currentNodeName)
+      || currentNodeName.toLowerCase() === moduleHelper.HEAD_COMPONENT_NAME;
   }
 
   /**
@@ -875,7 +872,7 @@ class DocumentRenderer {
    * @private
    */
   _generateLocalContext (context = {}) {
-    if (!context.constructor || !context.name) {
+    if (!context.component || !context.component.constructor || !context.name) {
       this._eventBus.emit('error', new Error(ERROR_MISSED_REQUIRED_DESCRIPTOR_FIELDS));
       return;
     }
@@ -1002,14 +999,12 @@ class DocumentRenderer {
    *   isHeadRendered: boolean,
    *   bindMethods: Array,
    *   routingContext: Object,
-   *   components: Object,
+   *   rootsIds: {},
    *   roots: Array.<Element>
    * }} The context object.
    * @private
    */
   _createRenderingContext (changedWatchers) {
-    var components = this._componentLoader.getComponentsByNames();
-
     return {
       config: this._config,
       renderedIds: Object.create(null),
@@ -1017,9 +1012,8 @@ class DocumentRenderer {
       isHeadRendered: false,
       bindMethods: [],
       routingContext: this._currentRoutingContext,
-      components: components,
       rootIds: Object.create(null),
-      roots: changedWatchers ? this._findRenderingRoots(changedWatchers) : []
+      roots: []
     };
   }
 
@@ -1035,6 +1029,7 @@ class DocumentRenderer {
     if (element === this._window.document.head) {
       return SPECIAL_IDS.$$head;
     }
+
     return element.getAttribute(moduleHelper.ATTRIBUTE_ID);
   }
 
