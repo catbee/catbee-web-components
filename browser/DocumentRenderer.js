@@ -36,23 +36,60 @@ class DocumentRenderer {
     this._eventBus = locator.resolve('eventBus');
     this._config = locator.resolve('config');
 
+    this._isUpdating = false;
     this._currentRoutingContext = null;
+    this._state = null;
     this._componentInstances = Object.create(null);
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
+    this._componentWatchers = Object.create(null);
     this._localContextRegistry = Object.create(null);
+    this._currentChangedComponents = Object.create(null);
+
+    this._eventBus.on('componentStateChanged', (componentId) => {
+      this._currentChangedComponents[componentId] = true;
+
+      // We must wait next tick, before we run update.
+      // It's allow collect all sync updates events
+      Promise.resolve()
+        .then(() => this._updateComponents());
+    });
   }
 
-  initWithState (routingContext = {}) {
+  initWithState (routingContext) {
     return Promise.resolve()
       .then(() => {
         this._currentRoutingContext = routingContext;
+        this._state = new State(this._locator);
+
+        var signal = routingContext.args.signal;
+
+        if (!signal || !Array.isArray(signal)) {
+          return;
+        }
+
+        return this._state.signal(signal, routingContext, routingContext.args);
       })
       .then(() => {
         const documentElement = this._window.document.documentElement;
         const action = (element) => this._initializeComponent(element);
         return this._traverseComponents([documentElement], action);
       })
+  }
+
+  updateState (routingContext) {
+    return Promise.resolve()
+      .then(() => {
+        this._currentRoutingContext = routingContext;
+        var signal = routingContext.args.signal;
+
+        if (!signal || !Array.isArray(signal)) {
+          return;
+        }
+
+        return this._state.signal(signal, routingContext, routingContext.args);
+      })
+      .catch(reason => this._eventBus.emit('error', reason));
   }
 
   renderComponent (element, rootComponentDescriptor, renderingContext) {
@@ -70,7 +107,7 @@ class DocumentRenderer {
         }
 
         if (!renderingContext) {
-          renderingContext = this._createRenderingContext([]);
+          renderingContext = this._createRenderingContext();
           renderingContext.rootIds[id] = true;
         }
 
@@ -136,9 +173,8 @@ class DocumentRenderer {
 
             return Promise.all(promises);
           })
-          .then(() => {
-            return this._bindComponent(element);
-          })
+          .then(() => this._bindComponent(element))
+          .then(() => this._bindWatcher(localContext, element))
           .then(() => {
             // collecting garbage only when
             // the entire rendering is finished
@@ -149,6 +185,83 @@ class DocumentRenderer {
           })
           .catch(reason => this._eventBus.emit('error', reason));
       });
+  }
+
+  collectGarbage () {
+    return Promise.resolve()
+      .then(() => {
+        const context = {
+          roots: []
+        };
+
+        Object.keys(this._componentElements)
+          .forEach(id => {
+            // we should not remove special elements like HEAD
+            if (SPECIAL_IDS.hasOwnProperty(id)) {
+              return;
+            }
+
+            let current = this._componentElements[id];
+            while (current !== this._window.document.documentElement) {
+              // the component is situated in a detached DOM subtree
+              if (current.parentElement === null) {
+                context.roots.push(current);
+                break;
+              }
+              // the component is another component's descendant
+              if (moduleHelper.isComponentNode(current.parentElement)) {
+                break;
+              }
+              current = current.parentElement;
+            }
+          });
+
+        return this._removeDetachedComponents(context);
+      });
+  }
+
+  createComponent (tagName, component, attributes) {
+    if (typeof (tagName) !== 'string') {
+      return Promise.reject(
+        new Error('The tag name must be a string')
+      );
+    }
+
+    attributes = attributes || Object.create(null);
+
+    return Promise.resolve()
+      .then(() => {
+        const componentName = moduleHelper.getOriginalComponentName(tagName);
+
+        if (moduleHelper.isHeadComponent(componentName) || moduleHelper.isDocumentComponent(componentName)) {
+          return Promise.reject(new Error(`Component for tag "${tagName}" not found`));
+        }
+
+        const safeTagName = moduleHelper.getTagNameForComponentName(componentName);
+        const element = this._window.document.createElement(safeTagName);
+
+        Object.keys(attributes)
+          .forEach(attributeName => element.setAttribute(attributeName, attributes[attributeName]));
+
+        return this.renderComponent(element, component)
+          .then(() => element);
+      });
+  }
+
+  getComponentById (id) {
+    const element = this._window.document.getElementById(id);
+    return this.getComponentByElement(element);
+  }
+
+  getComponentByElement(element) {
+    if (!element) {
+      return null;
+    }
+    const id = element[moduleHelper.COMPONENT_ID];
+    if (!id) {
+      return null;
+    }
+    return this._componentInstances[id] || null;
   }
 
   _generateLocalContext (element, rootElementContext) {
@@ -176,8 +289,12 @@ class DocumentRenderer {
 
       // Extend local registry
       var componentContext = parentContext.component.children.find((child) => child.name === componentName);
-      this._localContextRegistry[componentId] = componentContext;
 
+      if (!componentContext) {
+        return;
+      }
+
+      this._localContextRegistry[componentId] = componentContext;
       return contextToDescriptor(componentContext);
     }
   }
@@ -200,7 +317,7 @@ class DocumentRenderer {
     return componentContext;
   }
 
-  _createRenderingContext () {
+  _createRenderingContext (changedComponentsIds) {
     return {
       config: this._config,
       renderedIds: Object.create(null),
@@ -209,7 +326,7 @@ class DocumentRenderer {
       bindMethods: [],
       routingContext: this._currentRoutingContext,
       rootIds: Object.create(null),
-      roots: []
+      roots: changedComponentsIds ? this._findRenderingRoots(changedComponentsIds) : []
     };
   }
 
@@ -286,7 +403,8 @@ class DocumentRenderer {
         this._componentElements[id] = element;
         this._componentInstances[id] = instance;
 
-        return this._bindComponent(element);
+        return this._bindComponent(element)
+          .then(() => this._bindWatcher(localContext, element));
       });
   }
 
@@ -341,6 +459,26 @@ class DocumentRenderer {
       });
   }
 
+  _bindWatcher (localContext, element) {
+    var id = this._getId(element);
+    var attributes = attributesToObject(element);
+    var watcherDefinition = localContext.watcher;
+
+    if (!watcherDefinition) {
+      return Promise.resolve();
+    }
+
+    if (typeof watcherDefinition === 'function') {
+      watcherDefinition = watcherDefinition.apply(null, [attributes]);
+    }
+
+    var watcher = this._state.getWatcher(watcherDefinition);
+    watcher.on('update', () => this._eventBus.emit('componentStateChanged', id));
+    this._componentWatchers[id] = watcher;
+
+    return Promise.resolve();
+  }
+
   _createBindingHandler (componentRoot, selectorHandlers) {
     const selectors = Object.keys(selectorHandlers);
 
@@ -373,11 +511,22 @@ class DocumentRenderer {
     };
   }
 
+  _tryDispatchEvent (selectors, matchPredicate, handlers, event) {
+    return selectors.some(selector => {
+      if (!matchPredicate(selector)) {
+        return false;
+      }
+      handlers[selector](event);
+      return true;
+    });
+  }
+
   _unbindAll (element, renderingContext) {
     const action = (innerElement) => {
       const id = this._getId(innerElement);
       renderingContext.unboundIds[id] = true;
-      return this._unbindComponent(innerElement);
+      return this._unbindComponent(innerElement)
+        .then(() => this._unbindWatcher(id));
     };
 
     return this._traverseComponents([element], action);
@@ -408,8 +557,51 @@ class DocumentRenderer {
       .catch(reason => this._eventBus.emit('error', reason));
   }
 
-  _collectRenderingGarbage () {
-    return Promise.resolve()
+  _unbindWatcher (id) {
+    var watcher = this._componentWatchers[id];
+
+    if (!watcher) {
+      return;
+    }
+
+    watcher.off('update');
+    watcher.release();
+    delete this._componentWatchers[id];
+  }
+
+  _collectRenderingGarbage (renderingContext) {
+    Object.keys(renderingContext.unboundIds)
+      .forEach(id => {
+        // this component has been rendered again and we do not need to
+        // remove it.
+        if (id in renderingContext.renderedIds) {
+          return;
+        }
+
+        this._removeComponentById(id);
+      });
+  }
+
+  _removeComponentById (id) {
+    delete this._componentElements[id];
+    delete this._componentInstances[id];
+    delete this._componentBindings[id];
+  }
+
+  _removeDetachedComponents(context) {
+    if (context.roots.length === 0) {
+      return Promise.resolve();
+    }
+    const root = context.roots.pop();
+    return this._traverseComponents([root], element => this._removeDetachedComponent(element))
+      .then(() => this._removeDetachedComponents(context));
+  }
+
+  _removeDetachedComponent (element) {
+    const id = this._getId(element);
+    return this._unbindComponent(element)
+      .then(() => this._unbindWatcher(id))
+      .then(() => this._removeComponentById(id));
   }
 
   _mergeHead (head, newHead) {
@@ -445,21 +637,72 @@ class DocumentRenderer {
     }
   }
 
-  _getElementKey (element) {
-    // some immutable elements have several valuable attributes
-    // these attributes define the element identity
-    const attributes = [];
-
-    switch (element.nodeName) {
-      case TAG_NAMES.LINK:
-        attributes.push(`href=${element.getAttribute('href')}`);
-        break;
-      case TAG_NAMES.SCRIPT:
-        attributes.push(`src=${element.getAttribute('src')}`);
-        break;
+  _updateComponents () {
+    if (this._isUpdating) {
+      return Promise.resolve();
     }
 
-    return `<${element.nodeName} ${attributes.sort().join(' ')}>${element.textContent}</${element.nodeName}>`;
+    this._isUpdating = true;
+
+    var changedComponentsIds = Object.keys(this._currentChangedComponents);
+    var renderingContext = this._createRenderingContext(changedComponentsIds);
+
+    var promises = renderingContext.roots.map(root => {
+      var id = this._getId(root);
+      renderingContext.rootIds[id] = true;
+      return this.renderComponent(root, false, renderingContext);
+    });
+
+    return Promise.all(promises)
+      .catch(reason => this._eventBus.emit('error', reason))
+      .then(() => {
+        this._isUpdating = false;
+      });
+  }
+
+  _findRenderingRoots (changedComponentsIds = []) {
+    var lastRoot;
+    var lastRootId;
+    var current;
+    var currentId;
+    var roots = [];
+    var rootsSet = Object.create(null);
+
+    changedComponentsIds
+      .map((componentId) => {
+        return {
+          id: componentId,
+          element: this._componentElements[componentId]
+        }
+      })
+      .forEach(component => {
+        current = component.element;
+        currentId = component.id;
+
+        lastRoot = current;
+        lastRootId = currentId;
+
+        while (current.parentElement) {
+          current = current.parentElement;
+          currentId = this._getId(current);
+
+          if (!(changedComponentsIds.find((id) => currentId === id))) {
+            continue;
+          }
+
+          lastRoot = current;
+          lastRootId = currentId;
+        }
+
+        if (lastRootId in rootsSet) {
+          return;
+        }
+
+        rootsSet[lastRootId] = true;
+        roots.push(lastRoot);
+      });
+
+    return roots;
   }
 
   _handleRenderError (element, error) {
@@ -481,16 +724,6 @@ class DocumentRenderer {
       .catch(() => '');
   }
 
-  _tryDispatchEvent (selectors, matchPredicate, handlers, event) {
-    return selectors.some(selector => {
-      if (!matchPredicate(selector)) {
-        return false;
-      }
-      handlers[selector](event);
-      return true;
-    });
-  }
-
   _getId (element) {
     if (element === this._window.document.documentElement) {
       return SPECIAL_IDS.$$document;
@@ -509,6 +742,23 @@ class DocumentRenderer {
       }
     }
     return element[moduleHelper.COMPONENT_ID];
+  }
+
+  _getElementKey (element) {
+    // some immutable elements have several valuable attributes
+    // these attributes define the element identity
+    const attributes = [];
+
+    switch (element.nodeName) {
+      case TAG_NAMES.LINK:
+        attributes.push(`href=${element.getAttribute('href')}`);
+        break;
+      case TAG_NAMES.SCRIPT:
+        attributes.push(`src=${element.getAttribute('src')}`);
+        break;
+    }
+
+    return `<${element.nodeName} ${attributes.sort().join(' ')}>${element.textContent}</${element.nodeName}>`;
   }
 }
 
@@ -574,7 +824,10 @@ function findParentComponent (element) {
 }
 
 function contextToDescriptor (context) {
-  return Object.assign({ name: context.name }, context.component)
+  return Object.assign({
+    name: context.name,
+    watcher: context.watcher
+  }, context.component)
 }
 
 function attributesToObject (attributes) {

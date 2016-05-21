@@ -1000,9 +1000,510 @@ lab.experiment('browser/DocumentRenderer', () => {
           var element = window.document.createElement('cat-test1');
           element.setAttribute('label', 'first');
 
-          renderer.renderComponent(element)
+          renderer.renderComponent(element, outerComponent)
+            .then(() => {
+              assert.strictEqual(attributesLabel, 'first');
+              element.setAttribute('label', 'second');
+              return renderer.renderComponent(element, outerComponent);
+            })
+            .then(() => {
+              assert.strictEqual(attributesLabel, 'second');
+              done();
+            })
+            .catch(done);
         }
-      })
+      });
+    });
+
+    lab.test('should use the same component instance if it\'s element recreated after rendering', (done) => {
+      var instances = {
+        first: [],
+        second: [],
+        third: []
+      };
+
+      class Component1 {
+        constructor () {
+          instances.first.push(this);
+        }
+
+        template () {
+          return `
+          <div>Hello from test1</div>
+          <cat-test2 id="unique2"/>
+        `
+        }
+
+        render () {
+          return this.$context;
+        }
+      }
+
+      class Component2 {
+        constructor () {
+          instances.second.push(this);
+        }
+
+        template () {
+          return `
+          <span>
+          Hello from test2
+          <cat-test3 id="unique3"/>
+          </span>
+        `
+        }
+
+        render () {
+          return this.$context;
+        }
+      }
+
+      class Component3 {
+        constructor () {
+          instances.third.push(this);
+        }
+
+        template () {
+          return `
+          Hello from test3
+        `
+        }
+
+        render () {
+          return this.$context;
+        }
+      }
+
+      var component3 = {
+        constructor: Component3
+      };
+
+      var component2 = {
+        constructor: Component2,
+        children: [
+          {
+            name: 'test3',
+            component: component3
+          }
+        ]
+      };
+
+      var component1 = {
+        constructor: Component1,
+        children: [
+          {
+            name: 'test2',
+            component: component2
+          }
+        ]
+      };
+
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          var renderer = new DocumentRenderer(locator);
+          var element = window.document.createElement('cat-test1');
+
+          renderer.renderComponent(element, component1)
+            .then(function () {
+              return renderer.renderComponent(element, component1);
+            })
+            .then(function () {
+              return renderer.renderComponent(element, component1);
+            })
+            .then(function () {
+              assert.strictEqual(instances.first.length, 1);
+              assert.strictEqual(instances.second.length, 1);
+              assert.strictEqual(instances.third.length, 1);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('should use new component instance if it\'s element removed after rendering', (done) => {
+      var instances = {
+        first: [],
+        second: [],
+        third: []
+      };
+
+      var counter = 0;
+
+      class Component1 {
+        constructor () {
+          instances.first.push(this);
+        }
+
+        template () {
+          return `
+          <div>Hello from test1</div>
+          ${counter % 2 === 0 ? '' : '<cat-test2 />'}
+        `
+        }
+
+        render () {
+          return this.$context;
+        }
+      }
+
+      class Component2 {
+        constructor () {
+          instances.second.push(this);
+        }
+
+        template () {
+          return `
+          <span>
+          Hello from test2
+          <cat-test3/>
+          </span>
+        `
+        }
+
+        render () {
+          return this.$context;
+        }
+      }
+
+      class Component3 {
+        constructor () {
+          instances.third.push(this);
+        }
+
+        template () {
+          return `
+          Hello from test3
+        `
+        }
+
+        render () {
+          return this.$context;
+        }
+      }
+
+      var component3 = {
+        constructor: Component3
+      };
+
+      var component2 = {
+        constructor: Component2,
+        children: [
+          {
+            name: 'test3',
+            component: component3
+          }
+        ]
+      };
+
+      var component1 = {
+        constructor: Component1,
+        children: [
+          {
+            name: 'test2',
+            component: component2
+          }
+        ]
+      };
+
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+
+          var renderer = new DocumentRenderer(locator);
+          var element = window.document.createElement('cat-test1');
+
+          counter++;
+
+          renderer.renderComponent(element, component1)
+            .then(function () {
+              counter++;
+              return renderer.renderComponent(element, component1);
+            })
+            .then(function () {
+              counter++;
+              return renderer.renderComponent(element, component1);
+            })
+            .then(function () {
+              assert.strictEqual(instances.first.length, 1);
+              assert.strictEqual(instances.second.length, 2);
+              assert.strictEqual(instances.third.length, 2);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+  });
+
+  lab.experiment('#updateState', function () {
+    lab.test('should update all components that depend on changed watchers in descending order', (done) => {
+      var renders = [];
+
+      class Component1 {
+        template () {
+          return `
+            Hello from test2
+            <cat-test2 id="2" />
+          `
+        }
+
+        render () {
+          renders.push(this.$context.attributes.id);
+          return this.$context;
+        };
+      }
+
+      class Component2 {
+        template () {
+          return `
+            <span>
+            Hello from test2
+            <cat-test3 id="3" />
+            </span>
+          `
+        }
+
+        render () {
+          renders.push(this.$context.attributes.id);
+          return this.$context;
+        };
+      }
+
+      class Component3 {
+        template () {
+          return 'Hello from test3';
+        }
+
+        render () {
+          renders.push(this.$context.attributes.id);
+          return this.$context;
+        };
+      }
+
+      var component3 = {
+        constructor: Component3
+      };
+
+      var component2 = {
+        constructor: Component2,
+        children: [
+          {
+            name: 'test3',
+            component: component3,
+            watcher: {
+              update: ['update']
+            }
+          }
+        ]
+      };
+
+      var component1 = {
+        constructor: Component1,
+        children: [
+          {
+            name: 'test2',
+            component: component2,
+            watcher: {
+              update: ['update']
+            }
+          }
+        ]
+      };
+
+      var document = {
+        constructor: class Document {},
+        children: [
+          {
+            name: 'test1',
+            component: component1,
+            watcher: {
+              update: ['update']
+            }
+          },
+          {
+            name: 'test3',
+            component: component3,
+            watcher: {
+              update: ['update']
+            }
+          }
+        ]
+      };
+
+      var html = `
+        <cat-test1 id="1">
+          test1<br>
+          <div>Hello from test1</div>
+          <cat-test2 id="2">test2<br>
+            <span>
+              Hello from test2
+              <cat-test3 id="3">test3<br>Hello from test3</cat-test3>
+            </span>
+          </cat-test2>
+        </cat-test1>
+        <cat-test3 id="4">
+          test3<br>
+          Hello from test3
+        </cat-test3>
+      `;
+
+      var locator = createLocator(document);
+      var eventBus = locator.resolve('eventBus');
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: html,
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          var renderer = new DocumentRenderer(locator);
+
+          renderer.initWithState({
+            args: {
+              signal: [
+                function (args, state) {
+                  state.set('update', 'initial');
+                }
+              ]
+            }
+          })
+            .then(() => {
+              assert.strictEqual(renders.length, 0);
+              return renderer.updateState({
+                args: {
+                  signal: [
+                    function (args, state) {
+                      state.set('update', 'updated');
+                    }
+                  ]
+                }
+              });
+            })
+            .then(() => {
+              // We need wait some time to all updates called
+              setTimeout(function () {
+                try {
+                  assert.strictEqual(renders.length, 4);
+                  assert.strictEqual(renders[0], '4');
+                  assert.strictEqual(renders[1], '1');
+                  assert.strictEqual(renders[2], '2');
+                  assert.strictEqual(renders[3], '3');
+                  done();
+                } catch (e) {
+                  done(e);
+                }
+              }, 10);
+            })
+            .catch(done);
+        }
+      });
+    });
+  });
+
+  lab.experiment('#collectGarbage', () => {
+    lab.test('should unlink component if it is not in DOM', (done) => {
+      const unbinds = [];
+
+      class TestComponent {
+        unbind () {
+          unbinds.push(this.$context.name);
+        }
+      }
+
+      var test3 = {
+        constructor: class TestComponent3 extends TestComponent {
+          template () {
+            return ''
+          }
+        }
+      };
+
+      var test2 = {
+        constructor: class TestComponent2 extends TestComponent {
+          template () {
+            return ''
+          }
+        }
+      };
+
+      var test1 = {
+        constructor: class TestComponent1 extends TestComponent {
+          template () {
+            return `
+            <cat-test2></cat-test2>
+            <cat-test3></cat-test3>
+            `
+          }
+        },
+        children: [
+          {
+            name: 'test2',
+            component: test2
+          },
+          {
+            name: 'test3',
+            component: test3
+          }
+        ]
+      };
+
+      const locator = createLocator();
+
+      jsdom.env({
+        html: ' ',
+        done: (errors, window) => {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          let componentElements = null;
+
+          Promise.all([
+              renderer.createComponent('cat-test1', test1),
+              renderer.createComponent('cat-test2', test2),
+              renderer.createComponent('cat-test3', test3)
+            ])
+            .then(elements => {
+              componentElements = elements;
+              window.document.body.appendChild(elements[1]);
+              const areInstances = elements.every(el => {
+                const instance = renderer.getComponentByElement(el);
+                return instance instanceof TestComponent;
+              });
+              assert.strictEqual(areInstances, true);
+              return renderer.collectGarbage();
+            })
+            .then(() => {
+              const instance1 = renderer.getComponentByElement(componentElements[0]);
+              const instance2 = renderer.getComponentByElement(componentElements[1]);
+              const instance3 = renderer.getComponentByElement(componentElements[2]);
+
+              assert.strictEqual(instance1, null);
+              assert.strictEqual(instance2 instanceof TestComponent, true);
+              assert.strictEqual(instance3, null);
+
+              assert.deepEqual(unbinds, [
+                'test3',
+                'test1',
+                'test2',
+                'test3'
+              ]);
+            })
+            .then(done)
+            .catch(done);
+        }
+      });
     });
   });
 });
