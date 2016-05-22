@@ -124,7 +124,7 @@ class DocumentRenderer {
         const ComponentConstructor = localContext.constructor;
 
         if (!instance) {
-          ComponentConstructor.prototype.$context = this._getComponentContext(localContext, element);
+          ComponentConstructor.prototype.$context = this._getComponentContext(element);
           instance = new ComponentConstructor(this.locator);
           instance.$context = ComponentConstructor.prototype.$context;
           this._componentInstances[id] = instance;
@@ -299,9 +299,10 @@ class DocumentRenderer {
     }
   }
 
-  _getComponentContext (localContext, element) {
+  _getComponentContext (element) {
     const componentContext = Object.create(this._currentRoutingContext);
     const name = moduleHelper.getOriginalComponentName(element.tagName);
+    const id = this._getId(element);
 
     Object.defineProperties(componentContext, {
       name: {
@@ -314,7 +315,25 @@ class DocumentRenderer {
       }
     });
 
-    return componentContext;
+    componentContext.element = element;
+    componentContext.getComponentById = (id) => this.getComponentById(id);
+    componentContext.getComponentByElement = (element) => this.getComponentByElement(element);
+    componentContext.createComponent = (tagName, descriptor, attributes) =>
+      this.createComponent(tagName, descriptor, attributes);
+    componentContext.collectGarbage = () => this.collectGarbage();
+    componentContext.signal = (actions, args) => this._state.signal(actions, this._currentRoutingContext, args);
+
+    componentContext.getWatcherData = () => {
+      var watcher = this._componentWatchers[id];
+
+      if (!watcher) {
+        return Promise.resolve();
+      }
+
+      return watcher.get();
+    };
+
+    return Object.freeze(componentContext);
   }
 
   _createRenderingContext (changedComponentsIds) {
@@ -395,7 +414,7 @@ class DocumentRenderer {
         }
 
         const ComponentConstructor = localContext.constructor;
-        ComponentConstructor.prototype.$context = this._getComponentContext(localContext, element);
+        ComponentConstructor.prototype.$context = this._getComponentContext(element);
 
         const instance = new ComponentConstructor(this._locator);
         instance.$context = ComponentConstructor.prototype.$context;

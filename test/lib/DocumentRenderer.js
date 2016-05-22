@@ -40,7 +40,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         <html>
           <head></head>
         <body>
-        <cat-empty id="empty"></cat-empty>
+        <cat-empty></cat-empty>
         </body>
         </html>
       `;
@@ -185,8 +185,8 @@ lab.experiment('lib/DocumentRenderer', () => {
             <head></head>
             <body>
             document – ${context.name}
-            <cat-comp id="sync"></cat-comp>
-            <cat-async-comp id="async"></cat-async-comp>
+            <cat-comp></cat-comp>
+            <cat-async-comp></cat-async-comp>
             </body>
             </html>
           `
@@ -223,8 +223,8 @@ lab.experiment('lib/DocumentRenderer', () => {
             <head></head>
             <body>
             document – document
-            <cat-comp id="sync"><div>content – comp</div></cat-comp>
-            <cat-async-comp id="async"><div>test – async-comp</div></cat-async-comp>
+            <cat-comp><div>content – comp</div></cat-comp>
+            <cat-async-comp><div>test – async-comp</div></cat-async-comp>
             </body>
             </html>
           `;
@@ -249,8 +249,8 @@ lab.experiment('lib/DocumentRenderer', () => {
           <head></head>
           <body>
           document – ${context.name}
-          <cat-slow id="slow"></cat-slow>
-          <cat-fast id="fast"></cat-fast>
+          <cat-slow></cat-slow>
+          <cat-fast></cat-fast>
           </body>
           </html>
           `
@@ -264,7 +264,7 @@ lab.experiment('lib/DocumentRenderer', () => {
       class Slow {
         template () {
           return `
-          <cat-reusable id="reusable-slow"></cat-reusable>
+          <cat-reusable></cat-reusable>
           `;
         }
 
@@ -280,7 +280,7 @@ lab.experiment('lib/DocumentRenderer', () => {
       class Fast {
         template () {
           return `
-          <cat-reusable id="reusable-fast"></cat-reusable>
+          <cat-reusable></cat-reusable>
           `;
         }
 
@@ -362,11 +362,11 @@ lab.experiment('lib/DocumentRenderer', () => {
           <head></head>
           <body>
           document – document
-          <cat-slow id="slow">
-          <cat-reusable id="reusable-slow">Slow</cat-reusable>
+          <cat-slow>
+          <cat-reusable>Slow</cat-reusable>
           </cat-slow>
-          <cat-fast id="fast">
-          <cat-reusable id="reusable-fast">Fast</cat-reusable>
+          <cat-fast>
+          <cat-reusable>Fast</cat-reusable>
           </cat-fast>
           </body>
           </html>
@@ -525,7 +525,7 @@ lab.experiment('lib/DocumentRenderer', () => {
             <head></head>
             <body>
             document – ${context.name}
-            <cat-empty id="empty"></cat-empty>
+            <cat-empty></cat-empty>
             </body>
             </html>
           `
@@ -600,7 +600,7 @@ lab.experiment('lib/DocumentRenderer', () => {
             <head><title>Test</title></head>
             <body>
             document – document
-            <cat-empty id="empty">empty - empty</cat-empty>
+            <cat-empty>empty - empty</cat-empty>
             </body>
             </html>
           `;
@@ -621,7 +621,7 @@ lab.experiment('lib/DocumentRenderer', () => {
             <html>
             <head></head>
             <body>
-            <cat-error id="error"></cat-error>
+            <cat-error></cat-error>
             </body>
             </html>
           `
@@ -933,7 +933,7 @@ lab.experiment('lib/DocumentRenderer', () => {
             <html>
             <head></head>
             <body>
-            <cat-redirect id="redirect"></cat-redirect>
+            <cat-redirect></cat-redirect>
             </body>
             </html>
           `
@@ -976,7 +976,7 @@ lab.experiment('lib/DocumentRenderer', () => {
             <html>
             <head></head>
             <body>
-            <cat-redirect id="redirect"><script>redirect</script></cat-redirect>
+            <cat-redirect><script>redirect</script></cat-redirect>
             </body>
             </html>
           `;
@@ -997,7 +997,7 @@ lab.experiment('lib/DocumentRenderer', () => {
             <html>
             <head></head>
             <body>
-            <cat-cookie id="cookie"></cat-cookie>
+            <cat-cookie></cat-cookie>
             </body>
             </html>
           `
@@ -1043,7 +1043,7 @@ lab.experiment('lib/DocumentRenderer', () => {
             <html>
             <head></head>
             <body>
-            <cat-cookie id="cookie"><script>setCookie</script></cat-cookie>
+            <cat-cookie><script>setCookie</script></cat-cookie>
             </body>
             </html>
           `;
