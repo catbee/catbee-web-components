@@ -220,10 +220,10 @@ class DocumentRenderer {
       });
   }
 
-  createComponent (tagName, component, attributes) {
-    if (typeof (tagName) !== 'string') {
+  createComponent (tagName, component, attributes = {}) {
+    if (typeof (tagName) !== 'string' || (typeof (attributes) !== 'object' || Array.isArray(attributes))) {
       return Promise.reject(
-        new Error('The tag name must be a string')
+        new Error('Tag name should be a string and attributes should be an object')
       );
     }
 

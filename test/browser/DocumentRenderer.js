@@ -1249,7 +1249,7 @@ lab.experiment('browser/DocumentRenderer', () => {
     });
   });
 
-  lab.experiment('#updateState', function () {
+  lab.experiment('#updateState', () => {
     lab.test('should update all components that depend on changed watchers in descending order', (done) => {
       var renders = [];
 
@@ -1410,6 +1410,353 @@ lab.experiment('browser/DocumentRenderer', () => {
             .catch(done);
         }
       });
+    });
+
+    lab.test('should do nothing if nothing changes', (done) => {
+      var renders = [];
+
+      class Component1 {
+        template () {
+          return `
+            Hello from test2
+            <cat-test2 id="2" />
+          `
+        }
+
+        render () {
+          renders.push(this.$context.attributes.id);
+          return this.$context;
+        };
+      }
+
+      class Component2 {
+        template () {
+          return `
+            <span>
+            Hello from test2
+            <cat-test3 id="3" />
+            </span>
+          `
+        }
+
+        render () {
+          renders.push(this.$context.attributes.id);
+          return this.$context;
+        };
+      }
+
+      class Component3 {
+        template () {
+          return 'Hello from test3';
+        }
+
+        render () {
+          renders.push(this.$context.attributes.id);
+          return this.$context;
+        };
+      }
+
+      var component3 = {
+        constructor: Component3
+      };
+
+      var component2 = {
+        constructor: Component2,
+        children: [
+          {
+            name: 'test3',
+            component: component3,
+            watcher: {
+              update: ['notExistPath']
+            }
+          }
+        ]
+      };
+
+      var component1 = {
+        constructor: Component1,
+        children: [
+          {
+            name: 'test2',
+            component: component2,
+            watcher: {
+              update: ['notExistPath']
+            }
+          }
+        ]
+      };
+
+      var document = {
+        constructor: class Document {},
+        children: [
+          {
+            name: 'test1',
+            component: component1,
+            watcher: {
+              update: ['notExistPath']
+            }
+          },
+          {
+            name: 'test3',
+            component: component3,
+            watcher: {
+              update: ['notExistPath']
+            }
+          }
+        ]
+      };
+
+      var html = `
+        <cat-test1 id="1">
+          test1<br>
+          <div>Hello from test1</div>
+          <cat-test2 id="2">test2<br>
+            <span>
+              Hello from test2
+              <cat-test3 id="3">test3<br>Hello from test3</cat-test3>
+            </span>
+          </cat-test2>
+        </cat-test1>
+        <cat-test3 id="4">
+          test3<br>
+          Hello from test3
+        </cat-test3>
+      `;
+
+      var locator = createLocator(document);
+      var eventBus = locator.resolve('eventBus');
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: html,
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          var renderer = new DocumentRenderer(locator);
+
+          renderer.initWithState({
+            args: {
+              signal: [
+                function (args, state) {
+                  state.set('update', 'initial');
+                }
+              ]
+            }
+          })
+            .then(() => {
+              assert.strictEqual(renders.length, 0);
+              return renderer.updateState({
+                args: {
+                  signal: [
+                    function (args, state) {
+                      state.set('update', 'updated');
+                    }
+                  ]
+                }
+              });
+            })
+            .then(() => {
+              // We need wait some time to all updates called
+              setTimeout(function () {
+                try {
+                  assert.strictEqual(renders.length, 0);
+                  done();
+                } catch (e) {
+                  done(e);
+                }
+              }, 10);
+            })
+            .catch(done);
+        }
+      });
+    });
+  });
+
+  lab.experiment('#createComponent', () => {
+    lab.test('should properly create and render component', (done) => {
+      class Component {
+        template () {
+          return '<div>Hello, World!</div>'
+        }
+      }
+
+      var component = {
+        constructor: Component
+      };
+
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+
+      var expected = '<div>Hello, World!</div>';
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          var renderer = new DocumentRenderer(locator);
+          renderer.createComponent('cat-test', component)
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected);
+              assert.strictEqual(renderer.getComponentByElement(element) instanceof Component, true);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('should properly render nested components', (done) => {
+      class Component1 {
+        template () {
+          return `
+              <div>Hello from test1!</div>
+              <cat-test2 id="test2"></cat-test2>
+              <cat-test3 id="test3"></cat-test3>
+            `
+        }
+      }
+
+      class Component2 {
+        template () {
+          return '<div>Hello from test2!</div>'
+        }
+      }
+
+      class Component3 {
+        template () {
+          return '<div>Hello from test3!</div>'
+        }
+      }
+
+      class Component4 {
+        template() {
+          return '<div>Hello from test4!</div>'
+        }
+      }
+
+      var component4 = {
+        constructor: Component4
+      };
+
+      var component3 = {
+        constructor: Component3
+      };
+
+      var component2 = {
+        constructor: Component2
+      };
+
+      var component1 = {
+        constructor: Component1,
+        children: [
+          {
+            name: 'test3',
+            component: component3
+          },
+          {
+            name: 'test2',
+            component: component2
+          }
+        ]
+      };
+
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+      eventBus.on('error', done);
+
+      var expected1 = `
+              <div>Hello from test1!</div>
+              <cat-test2 id="test2"><div>Hello from test2!</div></cat-test2>
+              <cat-test3 id="test3"><div>Hello from test3!</div></cat-test3>
+            `;
+
+      var expected2 = '<div>Hello from test4!</div>';
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          var renderer = new DocumentRenderer(locator);
+
+          renderer.createComponent('cat-test1', component1,  { id: 'test1' })
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected1);
+              return renderer.createComponent('cat-test4', component4, { id: 'test4' });
+            })
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected2);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('should reject promise if tag name is not a string', (done) => {
+      class Component {
+        template () {
+
+        }
+      }
+
+      var component = {
+        constructor: Component
+      };
+
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          var renderer = new DocumentRenderer(locator);
+
+          renderer.createComponent(500, component)
+            .then(function () {
+              done(new Error('Should fail'));
+            })
+            .catch(function (reason) {
+              assert.strictEqual(reason.message, 'Tag name should be a string and attributes should be an object');
+              done();
+            });
+        }
+      });
+    });
+
+    lab.test('should reject promise if attributes set is not an object', (done) => {
+      class Component {
+        template () {
+
+        }
+      }
+
+      var component = {
+        constructor: Component
+      };
+
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          var renderer = new DocumentRenderer(locator);
+
+          renderer.createComponent('cat-test', component, 500)
+            .then(function () {
+              done(new Error('Should fail'));
+            })
+            .catch(function (reason) {
+              assert.strictEqual(reason.message, 'Tag name should be a string and attributes should be an object');
+              done();
+            });
+        }
+      });
+
     });
   });
 
