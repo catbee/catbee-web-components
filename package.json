@@ -1,6 +1,6 @@
 {
   "name": "catbee-web-components",
-  "version": "1.0.0",
+  "version": "1.0.0-alpha.0",
   "description": "Catbee web components renderer",
   "main": "index.js",
   "scripts": {
@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/catbee/catbee-web-components#readme",
   "dependencies": {
-    "appstate": "catbee/appstate#dev",
+    "appstate": "2.0.0",
     "baobab": "^2.3.3",
     "browser-process-hrtime": "^0.1.2",
     "entities": "^1.1.1",
