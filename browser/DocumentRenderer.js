@@ -145,6 +145,7 @@ class DocumentRenderer {
             return this._unbindAll(element, renderingContext);
           })
           .catch(reason => this._eventBus.emit('error', reason))
+          .then(() => this._bindWatcher(localContext, element))
           .then(() => {
             const renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
             return moduleHelper.getSafePromise(renderMethod);
@@ -176,7 +177,6 @@ class DocumentRenderer {
             return Promise.all(promises);
           })
           .then(() => this._bindComponent(element))
-          .then(() => this._bindWatcher(localContext, element))
           .then(() => {
             // collecting garbage only when
             // the entire rendering is finished
@@ -324,6 +324,7 @@ class DocumentRenderer {
       this.createComponent(tagName, descriptor, attributes);
     componentContext.collectGarbage = () => this.collectGarbage();
     componentContext.signal = (actions, args) => this._state.signal(actions, this._currentRoutingContext, args);
+    componentContext.props = this._localContextRegistry[id].props;
 
     componentContext.getWatcherData = () => {
       var watcher = this._componentWatchers[id];
@@ -332,7 +333,9 @@ class DocumentRenderer {
         return Promise.resolve();
       }
 
-      return watcher.get();
+      return Promise.resolve(
+        watcher.get()
+      );
     };
 
     return Object.freeze(componentContext);
