@@ -485,7 +485,7 @@ class DocumentRenderer {
 
   _bindWatcher (localContext, element) {
     var id = this._getId(element);
-    var attributes = attributesToObject(element);
+    var attributes = attributesToObject(element.attributes);
     var watcherDefinition = localContext.watcher;
 
     if (!watcherDefinition) {
