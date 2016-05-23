@@ -699,7 +699,8 @@ class DocumentRenderer {
           element: this._componentElements[componentId]
         }
       })
-      .forEach(component => {
+      .filter((component) => component.element)
+      .forEach((component) => {
         current = component.element;
         currentId = component.id;
 
