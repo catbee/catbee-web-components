@@ -177,3 +177,19 @@ Every component's $context is extended with the following properties & methods:
 - __this.$context.getComponentByElement(domElement)__ – gets another component's object by its DOM element.
 - __this.$context.createComponent('tagName', attributesObject)__ – creates a new component's instance and returns a promise of its DOM element.
 - __this.$context.collectGarbage()__ – collects all components which have been created using the createComponent('tagName', attributesObject) method and are not attached to the DOM at the moment.
+
+### Data flow
+
+Library provide built-in data-flow system.
+
+![Data Flow](https://raw.githubusercontent.com/catbee/catbee-web-components/master/image.png "Data Flow")
+
+Core things:
+
+- Components are stateless
+- Components can't direct change state
+- Components send signals
+- Signals run actions that mutate state
+- Components watch tree branches
+- State send updates to components when branch was changed
+- Component rerender when watched branches was changed
