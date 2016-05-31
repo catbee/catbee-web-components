@@ -184,7 +184,7 @@ Library provide built-in data-flow system.
 
 ![Data Flow](https://raw.githubusercontent.com/catbee/catbee-web-components/master/image.png "Data Flow")
 
-Core things:
+__Core things:__
 
 - Components are stateless
 - Components can't direct change state
