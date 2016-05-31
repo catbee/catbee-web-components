@@ -63,6 +63,11 @@ const components = require('catbee-web-components');
 components.register(locator, root);
 ```
 
+### Component detection
+
+Catbee Web Components mark tag as component if it have `cat-*` prefix.
+Head is special name, and can be used without prefix.
+
 ### Component Specification
 
 ``` javascript
@@ -165,10 +170,10 @@ Every component's $context is extended with the following properties & methods:
 - __this.$context.getWatcherData()__ - return Promise resolved by state tree projection data.
 - __this.$context.signal(actions, args)__ - run [appstate](https://github.com/catbee/appstate) signal with actions array and args object.
 - __this.$context.state__ - the current application state reference.
+- __this.$context.props__ - the set of props passed by parent component.
 - __this.$context.element__ – the current DOM element that represents the current component.
 - __this.$context.attributes__ – the set of attributes which component's DOM element has at the moment.
 - __this.$context.getComponentById('id')__ – gets another component object by ID of its element.
 - __this.$context.getComponentByElement(domElement)__ – gets another component's object by its DOM element.
 - __this.$context.createComponent('tagName', attributesObject)__ – creates a new component's instance and returns a promise of its DOM element.
 - __this.$context.collectGarbage()__ – collects all components which have been created using the createComponent('tagName', attributesObject) method and are not attached to the DOM at the moment.
-
