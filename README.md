@@ -144,3 +144,30 @@ module.exports = {
     }
   ]
 }
+```
+
+### Shared context
+Catbee sets as the property $context for every instance of each signal action and component.
+
+- this.$context.isBrowser – true if code is being executed in the browser.
+- this.$context.isServer – true if code is being executed on the server.
+- this.$context.userAgent – the current user agent string of the environment.
+- this.$context.cookie – the current cookie wrapper object.
+- this.$context.location – the current URI object that constains the current location.
+- this.$context.referrer – the current URI object that contains the current referrer.
+- this.$context.locator – the Service Locator of the application.
+- this.$context.notFound() – hands over request handling to the next express/connect middleware. If used while rendering the document or head component, this action will be accomplished using HTTP headers and status codes on the server, else via an inline <script> tag.
+
+### Component context
+Every component's $context is extended with the following properties & methods:
+
+- this.$context.getWatcherData() - return Promise resolved by state tree projection data.
+- this.$context.signal(actions, args) - run [appstate](https://github.com/catbee/appstate) signal with actions array and args object.
+- this.$context.state - the current application state reference.
+- this.$context.element – the current DOM element that represents the current component.
+- this.$context.attributes – the set of attributes which component's DOM element has at the moment.
+- this.$context.getComponentById('id') – gets another component object by ID of its element.
+- this.$context.getComponentByElement(domElement) – gets another component's object by its DOM element.
+- this.$context.createComponent('tagName', attributesObject) – creates a new component's instance and returns a promise of its DOM element.
+- this.$context.collectGarbage() – collects all components which have been created using the createComponent('tagName', attributesObject) method and are not attached to the DOM at the moment.
+
