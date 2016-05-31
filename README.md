@@ -156,6 +156,7 @@ Catbee sets as the property $context for every instance of each signal action an
 - this.$context.location – the current URI object that constains the current location.
 - this.$context.referrer – the current URI object that contains the current referrer.
 - this.$context.locator – the Service Locator of the application.
+- this.$context.redirect('String') – redirects to a specified location string. If used while rendering the document or head component, this action will be accomplished using HTTP headers and status codes on the server, else via an inline `<script>` tag.
 - this.$context.notFound() – hands over request handling to the next express/connect middleware. If used while rendering the document or head component, this action will be accomplished using HTTP headers and status codes on the server, else via an inline `<script>` tag.
 
 ### Component context
