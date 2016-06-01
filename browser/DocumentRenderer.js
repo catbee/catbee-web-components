@@ -50,7 +50,7 @@ class DocumentRenderer {
       this._currentChangedComponents[componentId] = true;
 
       // We must wait next tick, before we run update.
-      // It's allow collect all sync updates events
+      // It allows to collect all sync update events
       Promise.resolve()
         .then(() => this._updateComponents());
     });
@@ -69,7 +69,7 @@ class DocumentRenderer {
         }
 
         return this._state.signal(signal, routingContext, routingContext.args)
-          .then(() => this._state.tree.commit()); // Tree should clear updates queue;;
+          .then(() => this._state.tree.commit()); // Tree should clear the updates queue;;
       })
       .then(() => {
         const documentElement = this._window.document.documentElement;
@@ -89,7 +89,7 @@ class DocumentRenderer {
         }
 
         return this._state.signal(signal, routingContext, routingContext.args)
-          .then(() => this._state.tree.commit()); // Tree should clear updates queue
+          .then(() => this._state.tree.commit()); // Tree should clear the updates queue
       })
       .catch(reason => this._eventBus.emit('error', reason));
   }
@@ -136,8 +136,8 @@ class DocumentRenderer {
 
         return Promise.resolve()
           .then(() => {
-            // we need unbind the whole hierarchy only at
-            // the beginning and not for new elements
+            // we need to unbind the whole hierarchy only at
+            // the beginning, not for any new elements
             if (!(id in renderingContext.rootIds) || !hadChildrenNodes) {
               return [];
             }
@@ -179,7 +179,7 @@ class DocumentRenderer {
           .then(() => this._bindComponent(element))
           .then(() => {
             // collecting garbage only when
-            // the entire rendering is finished
+            // the whole rendering is finished
             if (!(id in renderingContext.rootIds) || !hadChildrenNodes) {
               return;
             }
@@ -198,14 +198,14 @@ class DocumentRenderer {
 
         Object.keys(this._componentElements)
           .forEach(id => {
-            // we should not remove special elements like HEAD
+            // we should not remove any special elements like HEAD
             if (SPECIAL_IDS.hasOwnProperty(id)) {
               return;
             }
 
             let current = this._componentElements[id];
             while (current !== this._window.document.documentElement) {
-              // the component is situated in a detached DOM subtree
+              // the component is located in a detached DOM subtree
               if (current.parentElement === null) {
                 context.roots.push(current);
                 break;
@@ -276,7 +276,7 @@ class DocumentRenderer {
       const componentName = moduleHelper.getOriginalComponentName(element.tagName);
       const parentComponent = findParentComponent(element);
 
-      // All descendant components must get context from parent node
+      // All descendant components must get context from the parent node
       if (!parentComponent) {
         return;
       }
@@ -284,7 +284,7 @@ class DocumentRenderer {
       const parentId = this._getId(parentComponent);
       const parentContext = this._localContextRegistry[parentId];
 
-      // If component not described in parent node, it's can't be rendered
+      // If component is not described in the parent node, it can't be rendered
       if (!parentContext || !parentContext.component.children) {
         return;
       }
@@ -596,7 +596,7 @@ class DocumentRenderer {
   _collectRenderingGarbage (renderingContext) {
     Object.keys(renderingContext.unboundIds)
       .forEach(id => {
-        // this component has been rendered again and we do not need to
+        // this component was rendered again and we do not need to
         // remove it.
         if (id in renderingContext.renderedIds) {
           return;
@@ -635,7 +635,7 @@ class DocumentRenderer {
 
     const headSet = Object.create(null);
 
-    // remove all nodes from the current HEAD except immutable ones
+    // remove all nodes from the current HEAD except the immutable ones
     for (let i = 0; i < head.childNodes.length; i++) {
       const current = head.childNodes[i];
       if (!isTagImmutable(current)) {
@@ -655,8 +655,8 @@ class DocumentRenderer {
       }
 
       head.appendChild(current);
-      // when we append existing child to another parent it removes
-      // the node from a previous parent
+      // when we append the existing child to another parent, it removes
+      // the node from the previous parent
       i--;
     }
   }
@@ -735,7 +735,7 @@ class DocumentRenderer {
 
     return Promise.resolve()
       .then(() => {
-        // do not corrupt existed HEAD when error occurs
+        // do not corrupt existing HEAD when an error occurs
         if (element.tagName === TAG_NAMES.HEAD) {
           return '';
         }
@@ -758,7 +758,7 @@ class DocumentRenderer {
       return SPECIAL_IDS.$$head;
     }
 
-    // if the element does not have an ID we create it
+    // if the element does not have an ID, we create it
     if (!element[moduleHelper.COMPONENT_ID]) {
       element[moduleHelper.COMPONENT_ID] = uuid.v4();
       // deal with possible collisions
@@ -864,7 +864,7 @@ function attributesToObject (attributes) {
 }
 
 function isTagImmutable (element) {
-  // these 3 kinds of tags once loaded can not be removed
+  // these 3 kinds of tags cannot be removed once loaded,
   // otherwise it will cause style or script reloading
   return element.nodeName === TAG_NAMES.SCRIPT ||
     element.nodeName === TAG_NAMES.STYLE ||

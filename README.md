@@ -1,10 +1,10 @@
 ## Catbee Web Components
 
-DocumentRenderer implementaion based on [Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components), spiced by [Appstate](https://github.com/catbee/appstate) and [Baobab](https://github.com/Yomguithereal/baobab) for state management. You can use it with any template engine (jade, handlebars, dust) and don't care about browser rendering because it's use [morphdom](https://github.com/patrick-steele-idem/morphdom) for patial DOM updates insteadof full-page rerendering.
+DocumentRenderer implementaion based on [Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components), spiced by [Appstate](https://github.com/catbee/appstate) and [Baobab](https://github.com/Yomguithereal/baobab) for state management. You can use it with any template engine (jade, handlebars, dust) and not worry about browser rendering because it uses [morphdom](https://github.com/patrick-steele-idem/morphdom) for partial DOM updates instead of full-page rerendering.
 
 ### Getting Started
 
-Web components is one of implementation Catbee view layer. It's should be register as Catbee service and provide root document component. Below you can get code example, that can be used for integration in browser.
+Web components is one of the implementations of Catbee view layer. It should be registered as Catbee service and provided root document component. Below is a code example for integration in browser.
 
 ``` javascript
 const catbee = require('catbee');
@@ -65,7 +65,7 @@ components.register(locator, root);
 
 ### Component detection
 
-Catbee Web Components mark tag as component if it have `cat-*` prefix.
+Catbee Web Components marks tag as component if it has `cat-*` prefix.
 Head is special name, and can be used without prefix.
 
 ### Component Specification
@@ -78,11 +78,11 @@ class Component {
     this._config = locator.resolve('config');
   }
   
-  // Template is function that called when you render component to HTML string
-  // It's accept ctx as first argument, and should return string.
+  // Template is a function that is called when you render component to HTML string
+  // It accepts ctx as a first argument, and should return string.
   // You can use any template language that can be compiled to function.
   // For example, you can use Handlebars require hook on server, 
-  // and webpack loader for client side bundle, and use next code:
+  // and webpack loader for client side bundle, with the following code:
   // 
   // constructor () {
   //   this.template = require('./template.hbs');
@@ -102,10 +102,10 @@ class Component {
   }
   
   render () {
-    // This method create ctx for template function
+    // This method creates ctx for template function
     // You should return Object or Promise resolved by Object
-    // Also here you can make any DOM manipulation, because at this step 
-    // all nodes already in DOM.
+    // Also here you can make any DOM manipulation, because at this point 
+    // all nodes are already in DOM.
     return { 
       world: 'Earth'
     }
@@ -122,7 +122,7 @@ class Component {
   
   unbind () {
     // This method can be used as dispose component hook.
-    // It's called before DOM is will be disposed and event listeners detached.
+    // It's called before DOM gets disposed and event listeners detached.
   }
 }
 
@@ -158,7 +158,7 @@ Catbee sets as the property $context for every instance of each signal action an
 - __this.$context.isServer__ – true if code is being executed on the server.
 - __this.$context.userAgent__ – the current user agent string of the environment.
 - __this.$context.cookie__ – the current cookie wrapper object.
-- __this.$context.location__ – the current URI object that constains the current location.
+- __this.$context.location__ – the current URI object that contains the current location.
 - __this.$context.referrer__ – the current URI object that contains the current referrer.
 - __this.$context.locator__ – the Service Locator of the application.
 - __this.$context.redirect('String')__ – redirects to a specified location string. If used while rendering the document or head component, this action will be accomplished using HTTP headers and status codes on the server, else via an inline `<script>` tag.
@@ -180,16 +180,16 @@ Every component's $context is extended with the following properties & methods:
 
 ### Data flow
 
-Library provide built-in data-flow system.
+Library provides built-in data-flow system.
 
 ![Data Flow](https://raw.githubusercontent.com/catbee/catbee-web-components/master/image.png "Data Flow")
 
 __Core things:__
 
 - Components are stateless
-- Components can't direct change state
+- Components can't directly change state
 - Components send signals
 - Signals run actions that mutate state
 - Components watch tree branches
-- State send updates to components when branch was changed
-- Component rerender when watched branches was changed
+- State send updates to components when a branch was changed
+- Component rerenders when watched branches were changed
