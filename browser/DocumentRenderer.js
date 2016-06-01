@@ -76,6 +76,7 @@ class DocumentRenderer {
         const action = (element) => this._initializeComponent(element);
         return this._traverseComponents([documentElement], action);
       })
+      .catch(reason => this._eventBus.emit('error', reason));
   }
 
   updateState (routingContext) {
