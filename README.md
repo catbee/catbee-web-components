@@ -175,7 +175,7 @@ Every component's $context is extended with the following properties & methods:
 - __this.$context.attributes__ – the set of attributes which component's DOM element has at the moment.
 - __this.$context.getComponentById('id')__ – gets another component object by ID of its element.
 - __this.$context.getComponentByElement(domElement)__ – gets another component's object by its DOM element.
-- __this.$context.createComponent('tagName', attributesObject)__ – creates a new component's instance and returns a promise of its DOM element.
+- __this.$context.createComponent('tagName', descriptor, attributesObject)__ – creates a new component's instance and returns a promise of its DOM element.
 - __this.$context.collectGarbage()__ – collects all components which have been created using the createComponent('tagName', attributesObject) method and are not attached to the DOM at the moment.
 
 ### Data flow
