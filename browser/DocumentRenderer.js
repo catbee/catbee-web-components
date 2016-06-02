@@ -128,7 +128,7 @@ class DocumentRenderer {
 
         if (!instance) {
           ComponentConstructor.prototype.$context = this._getComponentContext(element);
-          instance = new ComponentConstructor(this.locator);
+          instance = new ComponentConstructor(this._locator);
           instance.$context = ComponentConstructor.prototype.$context;
           this._componentInstances[id] = instance;
         }
