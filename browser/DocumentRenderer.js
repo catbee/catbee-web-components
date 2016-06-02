@@ -428,8 +428,8 @@ class DocumentRenderer {
         this._componentElements[id] = element;
         this._componentInstances[id] = instance;
 
-        return this._bindComponent(element)
-          .then(() => this._bindWatcher(localContext, element));
+        return this._bindWatcher(localContext, element)
+          .then(() => this._bindComponent(element));
       });
   }
 
