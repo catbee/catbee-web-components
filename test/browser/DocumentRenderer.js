@@ -70,15 +70,86 @@ lab.experiment('browser/DocumentRenderer', () => {
           var renderer = new DocumentRenderer(locator);
 
           renderer.initWithState({
-            args: {
+            args: {}
+          })
+            .then(() => {
+              assert.deepEqual(bindCalls, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
 
+    lab.test('should access to watcher data in bind', (done) => {
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+
+      class Empty {
+        template () {
+          return ``;
+        }
+
+        bind () {
+          this.$context.getWatcherData()
+            .then(data => assert
+              .deepEqual({ text: 'Test' }, data))
+            .then(() => done())
+            .catch(done);
+        }
+      }
+
+      class Document {
+      }
+
+      var empty = {
+        constructor: Empty
+      };
+
+      var document = {
+        constructor: Document,
+        children: [
+          {
+            name: 'empty',
+            component: empty,
+            watcher: {
+              text: ['text']
+            }
+          }
+        ]
+      };
+
+      var html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+      </head>
+      <body>
+      <cat-empty></cat-empty>
+      </body>
+      </html>
+      `;
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: html,
+        done: function (errors, window) {
+
+          locator.registerInstance('window', window);
+
+          var renderer = new DocumentRenderer(locator);
+          locator.registerInstance('documentComponent', document);
+
+          renderer.initWithState({
+            args: {
+              signal: [
+                function (args, state) {
+                  state.set('text', 'Test');
+                }
+              ]
             }
           })
-          .then(() => {
-            assert.deepEqual(bindCalls, expected);
-            done();
-          })
-          .catch(done);
+            .catch(done);
         }
       });
     });
@@ -1629,7 +1700,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       }
 
       class Component4 {
-        template() {
+        template () {
           return '<div>Hello from test4!</div>'
         }
       }
@@ -1678,7 +1749,7 @@ lab.experiment('browser/DocumentRenderer', () => {
           locator.registerInstance('window', window);
           var renderer = new DocumentRenderer(locator);
 
-          renderer.createComponent('cat-test1', component1,  { id: 'test1' })
+          renderer.createComponent('cat-test1', component1, { id: 'test1' })
             .then(function (element) {
               assert.strictEqual(element.innerHTML, expected1);
               return renderer.createComponent('cat-test4', component4, { id: 'test4' });
@@ -1817,10 +1888,10 @@ lab.experiment('browser/DocumentRenderer', () => {
           let componentElements = null;
 
           Promise.all([
-              renderer.createComponent('cat-test1', test1),
-              renderer.createComponent('cat-test2', test2),
-              renderer.createComponent('cat-test3', test3)
-            ])
+            renderer.createComponent('cat-test1', test1),
+            renderer.createComponent('cat-test2', test2),
+            renderer.createComponent('cat-test3', test3)
+          ])
             .then(elements => {
               componentElements = elements;
               window.document.body.appendChild(elements[1]);
@@ -1855,7 +1926,7 @@ lab.experiment('browser/DocumentRenderer', () => {
   });
 });
 
-function createLocator(documentComponent = {}, config = {}) {
+function createLocator (documentComponent = {}, config = {}) {
   var locator = new ServiceLocator();
   var eventBus = new events.EventEmitter();
 
