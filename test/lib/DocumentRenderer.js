@@ -76,6 +76,41 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
+    lab.test('should render nothing if no such head component', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+        </body>
+        </html>
+      `;
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, html, 'Wrong HTML');
+          done();
+        });
+    });
+
     lab.test('should ignore second head and document tags', (done) => {
       class Document {
         template (context) {
@@ -598,7 +633,112 @@ lab.experiment('lib/DocumentRenderer', () => {
             <!DOCTYPE html>
             <html>
             <head><title>Test</title></head>
+            <body><script>var CATBEE_CACHE = []</script>
+            document – document
+            <cat-empty>empty - empty</cat-empty>
+            </body>
+            </html>
+          `;
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('should render inline script with async actions results', (done) => {
+      class Document {
+        template (context) {
+          return `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
             <body>
+            document – ${context.name}
+            <cat-empty></cat-empty>
+            </body>
+            </html>
+          `
+        }
+
+        render () {
+          return this.$context;
+        }
+      }
+
+      class Head {
+        template (context) {
+          return `<title>${context.head}</title>`;
+        }
+
+        render () {
+          return this.$context.getWatcherData();
+        }
+      }
+
+      class Empty {
+        template (context) {
+          return `empty - ${context.value || 'empty'}`
+        }
+
+        render () {
+          return this.$context.getWatcherData();
+        }
+      }
+
+      var empty = {
+        constructor: Empty
+      };
+
+      var head = {
+        constructor: Head
+      };
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: head,
+            watcher: {
+              head: ['head']
+            }
+          },
+          {
+            name: 'empty',
+            component: empty
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document, {
+        signal: [
+          function (args, state) {
+            state.set('head', 'Test');
+          },
+          [
+            function (args, state, output) {
+              output.success({ test: 'test' });
+            },
+            {
+              success: []
+            }
+          ]
+        ]
+      });
+
+
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      documentRenderer.render(routingContext);
+
+      var expected = `
+            <!DOCTYPE html>
+            <html>
+            <head><title>Test</title></head>
+            <body><script>var CATBEE_CACHE = [{"outputPath":[1,0],"path":"success","args":{"test":"test"}}]</script>
             document – document
             <cat-empty>empty - empty</cat-empty>
             </body>
