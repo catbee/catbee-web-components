@@ -76,6 +76,41 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
+    lab.test('should render nothing if no such head component', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+        </body>
+        </html>
+      `;
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, html, 'Wrong HTML');
+          done();
+        });
+    });
+
     lab.test('should ignore second head and document tags', (done) => {
       class Document {
         template (context) {
