@@ -325,7 +325,7 @@ class DocumentRenderer {
       this.createComponent(tagName, descriptor, attributes);
     componentContext.collectGarbage = () => this.collectGarbage();
     componentContext.signal = (actions, args) => this._state.signal(actions, this._currentRoutingContext, args);
-    componentContext.props = this._localContextRegistry[id].props;
+    componentContext.props = this._localContextRegistry[id].props || Object.create(null);
 
     componentContext.getWatcherData = () => {
       var watcher = this._componentWatchers[id];
