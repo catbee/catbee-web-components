@@ -68,7 +68,7 @@ class DocumentRenderer {
           return;
         }
 
-        return this._state.signal(signal, routingContext, routingContext.args)
+        return this._state.signal(signal, routingContext, routingContext.args, this._window.CATBEE_CACHE)
           .then(() => this._state.tree.commit()); // Tree should clear the updates queue;;
       })
       .then(() => {
