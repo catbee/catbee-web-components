@@ -1299,6 +1299,88 @@ lab.experiment('lib/DocumentRenderer', () => {
 
     });
   });
+
+  lab.test('should render recursive components', (done) => {
+    var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-recursive id="1"></cat-recursive>
+        </body>
+        </html>
+      `;
+
+    class Recursive {
+      template (ctx) {
+        if (ctx.id > 10) {
+          return;
+        }
+
+        return `<cat-recursive id="${ctx.id}"></cat-recursive>`;
+      }
+
+      render () {
+        return {
+          id: Number(this.$context.attributes['id']) + 1
+        };
+      }
+    }
+
+    var recursive = {
+      constructor: Recursive,
+      children: [
+        {
+          name: 'recursive',
+          recursive: true
+        }
+      ]
+    };
+
+    class Document {
+      template () {
+        return html;
+      }
+    }
+
+    var document = {
+      name: 'document',
+      constructor: Document,
+      children: [
+        {
+          name: 'head',
+          component: headComponentMock
+        },
+        {
+          name: 'recursive',
+          component: recursive
+        }
+      ]
+    };
+
+    var routingContext = createRoutingContext(document);
+    var documentRenderer = routingContext.locator.resolve('documentRenderer');
+    var eventBus = routingContext.locator.resolve('eventBus');
+
+    documentRenderer.render(routingContext);
+
+    var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-recursive id="1"><cat-recursive id="2"><cat-recursive id="3"><cat-recursive id="4"><cat-recursive id="5"><cat-recursive id="6"><cat-recursive id="7"><cat-recursive id="8"><cat-recursive id="9"><cat-recursive id="10">undefined</cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive>
+        </body>
+        </html>
+      `;
+
+    routingContext.middleware.response
+      .on('error', done)
+      .on('finish', () => {
+        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+        done();
+      });
+  });
 });
 
 function createRoutingContext(documentDescriptor, args = {}, config = {}) {
