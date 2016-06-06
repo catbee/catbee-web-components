@@ -1299,6 +1299,70 @@ lab.experiment('lib/DocumentRenderer', () => {
 
     });
   });
+
+  lab.test('should render recursive components', (done) => {
+    var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-recursive id="1"></cat-recursive>
+        </body>
+        </html>
+      `;
+
+    class Recursive {
+      template (ctx) {
+        if (ctx.id > 10) {
+          return;
+        }
+
+        return `<cat-recursive id="${ctx.id}"></cat-recursive>`;
+      }
+    }
+
+    var recursive = {
+      constructor: Recursive,
+      children: {
+        name: 'recursive',
+        recursive: true
+      }
+    };
+
+    class Document {
+      template () {
+        return html;
+      }
+    }
+
+    var document = {
+      name: 'document',
+      constructor: Document,
+      children: [
+        {
+          name: 'head',
+          component: headComponentMock
+        },
+        {
+          name: 'recursive',
+          component: recursive
+        }
+      ]
+    };
+
+    var routingContext = createRoutingContext(document);
+    var documentRenderer = routingContext.locator.resolve('documentRenderer');
+    var eventBus = routingContext.locator.resolve('eventBus');
+
+    documentRenderer.render(routingContext);
+
+    routingContext.middleware.response
+      .on('error', done)
+      .on('finish', () => {
+        assert.strictEqual(routingContext.middleware.response.result, html, 'Wrong HTML');
+        done();
+      });
+  });
 });
 
 function createRoutingContext(documentDescriptor, args = {}, config = {}) {
