@@ -1319,14 +1319,22 @@ lab.experiment('lib/DocumentRenderer', () => {
 
         return `<cat-recursive id="${ctx.id}"></cat-recursive>`;
       }
+
+      render () {
+        return {
+          id: Number(this.$context.attributes['id']) + 1
+        };
+      }
     }
 
     var recursive = {
       constructor: Recursive,
-      children: {
-        name: 'recursive',
-        recursive: true
-      }
+      children: [
+        {
+          name: 'recursive',
+          recursive: true
+        }
+      ]
     };
 
     class Document {
