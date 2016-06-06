@@ -297,6 +297,10 @@ class DocumentRenderer {
         return;
       }
 
+      if (componentContext.recursive) {
+        componentContext = parentContext;
+      }
+
       this._localContextRegistry[componentId] = componentContext;
       return contextToDescriptor(componentContext);
     }

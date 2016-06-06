@@ -1364,10 +1364,20 @@ lab.experiment('lib/DocumentRenderer', () => {
 
     documentRenderer.render(routingContext);
 
+    var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-recursive id="1"><cat-recursive id="2"><cat-recursive id="3"><cat-recursive id="4"><cat-recursive id="5"><cat-recursive id="6"><cat-recursive id="7"><cat-recursive id="8"><cat-recursive id="9"><cat-recursive id="10">undefined</cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive>
+        </body>
+        </html>
+      `;
+
     routingContext.middleware.response
       .on('error', done)
       .on('finish', () => {
-        assert.strictEqual(routingContext.middleware.response.result, html, 'Wrong HTML');
+        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
         done();
       });
   });

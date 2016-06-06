@@ -1318,6 +1318,58 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       });
     });
+
+    lab.test('Should correct render recursive components', (done) => {
+      class Recursive {
+        template (ctx) {
+          if (ctx.id > 10) {
+            return '';
+          }
+
+          return `<cat-recursive id="${ctx.id}"></cat-recursive>`;
+        }
+
+        render () {
+          return {
+            id: Number(this.$context.attributes['id']) + 1
+          };
+        }
+      }
+
+      var recursive = {
+        constructor: Recursive,
+        children: [
+          {
+            name: 'recursive',
+            recursive: true
+          }
+        ]
+      };
+
+      var locator = createLocator();
+      var eventBus = locator.resolve('eventBus');
+
+      var expected = '<cat-recursive id="2"><cat-recursive id="3"><cat-recursive id="4"><cat-recursive id="5"><cat-recursive id="6"><cat-recursive id="7"><cat-recursive id="8"><cat-recursive id="9"><cat-recursive id="10"></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive>';
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+
+          var renderer = new DocumentRenderer(locator);
+          var element = window.document.createElement('cat-recursive');
+          element.setAttribute('id', '1');
+
+          renderer.renderComponent(element, recursive)
+            .then(function () {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
   });
 
   lab.experiment('#updateState', () => {
