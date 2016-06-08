@@ -153,6 +153,84 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       });
     });
+
+    lab.test('Should take parent props by parentPropsMap option', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+      const propertyValue = 'test';
+
+      class Document { }
+      class Parent {
+        template () {
+          return `<cat-current />`
+        }
+      }
+      class Current {
+        constructor () {
+          assert.equal(this.$context.props.field, propertyValue);
+          done();
+        }
+
+        template () {
+          return '';
+        }
+      }
+
+      const current = {
+        constructor: Current
+      };
+
+      const parent = {
+        constructor: Parent,
+        children: [
+          {
+            name: 'current',
+            component: current,
+            parentPropsMap: {
+              field: 'parentProperty'
+            }
+          }
+        ]
+      };
+
+      const document = {
+        constructor: Document,
+        children: [
+          {
+            name: 'parent',
+            component: parent,
+            props: {
+              parentProperty: propertyValue
+            }
+          }
+        ]
+      };
+
+      var html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+        </head>
+        <body>
+        <cat-parent><cat-current></cat-current></cat-parent>
+        </body>
+        </html>
+      `;
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html,
+        done (errors, window) {
+          locator.registerInstance('window', window);
+          locator.registerInstance('documentComponent', document);
+
+          const renderer = new DocumentRenderer(locator);
+          renderer
+            .initWithState({ args: { signal: [] } })
+            .catch(done);
+        }
+      })
+    })
   });
 
   lab.experiment('#renderComponent', () => {
