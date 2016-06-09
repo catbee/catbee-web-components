@@ -169,7 +169,7 @@ class DocumentRenderer {
 
             morphdom(element, tmpElement, {
               onBeforeMorphElChildren: (foundElement) =>
-                foundElement === element || !moduleHelper.isComponentNode(foundElement)
+              foundElement === element || !moduleHelper.isComponentNode(foundElement)
             });
 
             const promises = this._findNestedComponents(element)
@@ -256,7 +256,7 @@ class DocumentRenderer {
     return this.getComponentByElement(element);
   }
 
-  getComponentByElement(element) {
+  getComponentByElement (element) {
     if (!element) {
       return null;
     }
@@ -329,7 +329,7 @@ class DocumentRenderer {
       this.createComponent(tagName, descriptor, attributes);
     componentContext.collectGarbage = () => this.collectGarbage();
     componentContext.signal = (actions, args) => this._state.signal(actions, this._currentRoutingContext, args);
-    componentContext.props = this._localContextRegistry[id].props || Object.create(null);
+    componentContext.props = this._getComponentProps(element);
 
     componentContext.getWatcherData = () => {
       var watcher = this._componentWatchers[id];
@@ -344,6 +344,30 @@ class DocumentRenderer {
     };
 
     return Object.freeze(componentContext);
+  }
+
+  _getComponentProps (element) {
+    const id = this._getId(element);
+    const descriptor = this._localContextRegistry[id];
+    const componentProps = descriptor.props || Object.create(null);
+    const parentPropsMap = descriptor.parentPropsMap;
+
+    if (typeof parentPropsMap === 'object') {
+      const parentElement = findParentComponent(element);
+      const parentId = this._getId(parentElement);
+      const parentProps = this._localContextRegistry[parentId].props || Object.create(null);
+
+      Object
+        .keys(parentPropsMap)
+        .forEach((key) => {
+          const property = parentProps[parentPropsMap[key]];
+          if (property) {
+            componentProps[key] = property;
+          }
+        });
+    }
+
+    return componentProps;
   }
 
   _createRenderingContext (changedComponentsIds) {
@@ -617,7 +641,7 @@ class DocumentRenderer {
     delete this._componentBindings[id];
   }
 
-  _removeDetachedComponents(context) {
+  _removeDetachedComponents (context) {
     if (context.roots.length === 0) {
       return Promise.resolve();
     }

@@ -625,7 +625,6 @@ lab.experiment('lib/DocumentRenderer', () => {
         ]
       });
 
-
       var documentRenderer = routingContext.locator.resolve('documentRenderer');
       documentRenderer.render(routingContext);
 
@@ -729,7 +728,6 @@ lab.experiment('lib/DocumentRenderer', () => {
           ]
         ]
       });
-
 
       var documentRenderer = routingContext.locator.resolve('documentRenderer');
       documentRenderer.render(routingContext);
@@ -1298,6 +1296,111 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
 
     });
+
+    lab.test('should render with props and parent props data', (done) => {
+      const testText = 'test';
+
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-parent></cat-parent>
+        </body>
+        </html>
+      `;
+
+      class Current {
+        template (ctx) {
+          return `${ctx.text}`;
+        }
+
+        render () {
+          return {
+            text: this.$context.props.text
+          }
+        }
+      }
+
+      const current = {
+        constructor: Current
+      };
+
+      class Parent {
+        template () {
+          return `<cat-current></cat-current>`
+        }
+
+        render () {
+          return {
+            id: Number(this.$context.attributes['id']) + 1
+          };
+        }
+      }
+
+      var parent = {
+        constructor: Parent,
+        children: [
+          {
+            name: 'current',
+            component: current,
+            parentPropsMap: {
+              text: 'field'
+            }
+          }
+        ]
+      };
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'parent',
+            component: parent,
+            props: {
+              field: testText
+            }
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      const expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-parent><cat-current>test</cat-current></cat-parent>
+        </body>
+        </html>
+      `;
+
+      eventBus
+        .on('error', done);
+
+      documentRenderer.render(routingContext);
+
+      routingContext.middleware.response
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        })
+        .on('error', done);
+    });
   });
 
   lab.test('should render recursive components', (done) => {
@@ -1400,9 +1503,7 @@ function createRoutingContext(documentDescriptor, args = {}, config = {}) {
   var response = new ServerResponse();
   var context = {
     locator, args,
-    actions: {
-
-    },
+    actions: {},
     redirect: function (uriString) {
       context.actions.redirectedTo = uriString;
       return Promise.resolve();
