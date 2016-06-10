@@ -700,6 +700,8 @@ class DocumentRenderer {
     var changedComponentsIds = Object.keys(this._currentChangedComponents);
     var renderingContext = this._createRenderingContext(changedComponentsIds);
 
+    this._currentChangedComponents = Object.create(null);
+
     var promises = renderingContext.roots.map(root => {
       var id = this._getId(root);
       renderingContext.rootIds[id] = true;
