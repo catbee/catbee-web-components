@@ -37,6 +37,7 @@ class DocumentRenderer {
     this._config = locator.resolve('config');
 
     this._isUpdating = false;
+    this.awaitingRouting = false;
     this._currentRoutingContext = null;
     this._state = null;
     this._componentInstances = Object.create(null);
@@ -68,8 +69,11 @@ class DocumentRenderer {
           return;
         }
 
+        this.awaitingRouting = true;
+
         return this._state.signal(signal, routingContext, routingContext.args, this._window.CATBEE_CACHE)
-          .then(() => this._state.tree.commit()); // Tree should clear the updates queue;;
+          .then(() => this._state.tree.commit()) // Tree should clear the updates queue
+          .then(() => this.awaitingRouting = false)
       })
       .then(() => {
         const documentElement = this._window.document.documentElement;
@@ -89,10 +93,13 @@ class DocumentRenderer {
           return;
         }
 
+        this.awaitingRouting = true;
+
         return this._state.signal(signal, routingContext, routingContext.args)
-          .then(() => this._state.tree.commit()); // Tree should clear the updates queue
+          .then(() => this._state.tree.commit()) // Tree should clear the updates queue
+          .then(() => this.awaitingRouting = false);
       })
-      .catch(reason => this._eventBus.emit('error', reason));
+      .catch(reason => this._eventBus.emit('error', reason))
   }
 
   renderComponent (element, rootComponentDescriptor, renderingContext) {
