@@ -83,6 +83,12 @@ class DocumentRenderer {
     return Promise.resolve()
       .then(() => {
         this._currentRoutingContext = routingContext;
+        var silent = routingContext.args.$silent;
+
+        if (silent) {
+          return Promise.resolve();
+        }
+
         var signal = routingContext.args.signal;
 
         if (!signal || !Array.isArray(signal)) {
