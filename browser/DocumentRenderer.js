@@ -840,7 +840,7 @@ class DocumentRenderer {
     const redirectMethod = routingContext.redirect;
     routingContext.redirect = (uriString, options = {}) => {
       this._silent = options.silent;
-      redirectMethod.call(this, uriString, options);
+      redirectMethod.call(routingContext, uriString, options);
     };
 
     return routingContext;

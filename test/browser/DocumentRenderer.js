@@ -7,6 +7,7 @@ var appstate = require('appstate');
 var fs = require('fs');
 var ServiceLocator = require('catberry-locator');
 var DocumentRenderer = require('../../browser/DocumentRenderer');
+var ModuleApiProvider = require('../mocks/ModuleApiProvider');
 
 lab.experiment('browser/DocumentRenderer', () => {
   lab.experiment('#initWithState', () => {
@@ -2264,15 +2265,8 @@ function createLocator (documentComponent = {}, config = {}) {
   return locator;
 }
 
-function getRoutingContext (locator, routeArgs) {
-  const routingContext = {
-    redirect () {
-      const args = routeArgs;
-      const renderer = locator.resolve('documentRenderer');
+function getRoutingContext (locator, args) {
+  locator.registerInstance('routeDefinition', { args });
 
-      return renderer.updateState(Object.assign({}, routingContext, { args }));
-    }
-  };
-
-  return routingContext;
+  return new ModuleApiProvider(locator);
 }
