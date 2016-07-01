@@ -1770,6 +1770,202 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       });
     });
+
+    lab.test('should redirect without running signal, if silent mode', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+      eventBus.on('error', done);
+
+      let signalCalled = false;
+
+      const routingContext = getRoutingContext(locator, {
+        signal: [
+          () => {
+            signalCalled = true;
+          }
+        ]
+      });
+
+      Object.assign(routingContext, { args: {} });
+
+      class Document { }
+
+      class Link {
+        template () {
+          return `<a href="#" class="clickable"></a>`;
+        }
+
+        render () {
+          return {};
+        }
+
+        bind () {
+          return {
+            click: {
+              'a.clickable': this.redirect
+            }
+          }
+        }
+
+        redirect () {
+          this.$context.redirect('', { silent: true });
+        }
+      }
+
+      const link = {
+        constructor: Link
+      };
+
+      const document = {
+        constructor: Document,
+        children: [
+          {
+            name: 'link',
+            component: link
+          }
+        ]
+      };
+
+      var html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+        </head>
+        <body>
+          <cat-link><a href="#" class="clickable"></a></cat-link>
+        </body>
+        </html>
+      `;
+
+      jsdom.env({
+        html,
+        done (errors, window) {
+          locator.registerInstance('window', window);
+          locator.registerInstance('documentComponent', document);
+          locator.register('documentRenderer', DocumentRenderer, true);
+
+          const renderer = locator.resolve('documentRenderer');
+
+          renderer
+            .initWithState(routingContext)
+            .then(() => {
+              var event;
+              var links = window.document.querySelectorAll('a.clickable');
+
+              for (var i = 0; i < links.length; i++) {
+                event = window.document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                links[i].dispatchEvent(event);
+              }
+
+              return new Promise(resolve => setTimeout(resolve, 10));
+            })
+            .then(() => {
+              assert.equal(signalCalled, false);
+              done();
+            })
+            .catch(done);
+        }
+      })
+    });
+
+    lab.test('should redirect with signal running by default', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+      eventBus.on('error', done);
+
+      let signalCalled = false;
+
+      const routingContext = getRoutingContext(locator, {
+        signal: [
+          () => {
+            signalCalled = true;
+          }
+        ]
+      });
+
+      Object.assign(routingContext, { args: {} });
+
+      class Document { }
+
+      class Link {
+        template () {
+          return `<a href="#" class="clickable"></a>`;
+        }
+
+        render () {
+          return {};
+        }
+
+        bind () {
+          return {
+            click: {
+              'a.clickable': this.redirect
+            }
+          }
+        }
+
+        redirect () {
+          this.$context.redirect('');
+        }
+      }
+
+      const link = {
+        constructor: Link
+      };
+
+      const document = {
+        constructor: Document,
+        children: [
+          {
+            name: 'link',
+            component: link
+          }
+        ]
+      };
+
+      var html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+        </head>
+        <body>
+          <cat-link><a href="#" class="clickable"></a></cat-link>
+        </body>
+        </html>
+      `;
+
+      jsdom.env({
+        html,
+        done (errors, window) {
+          locator.registerInstance('window', window);
+          locator.registerInstance('documentComponent', document);
+          locator.register('documentRenderer', DocumentRenderer, true);
+
+          const renderer = locator.resolve('documentRenderer');
+
+          renderer
+            .initWithState(routingContext)
+            .then(() => {
+              var event;
+              var links = window.document.querySelectorAll('a.clickable');
+
+              for (let i = 0; i < links.length; i++) {
+                event = window.document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                links[i].dispatchEvent(event);
+              }
+
+              return new Promise(resolve => setTimeout(resolve, 10));
+            })
+            .then(() => {
+              assert.equal(signalCalled, true);
+              done();
+            })
+            .catch(done);
+        }
+      })
+    });
   });
 
   lab.experiment('#createComponent', () => {
@@ -2066,4 +2262,17 @@ function createLocator (documentComponent = {}, config = {}) {
   locator.registerInstance('documentComponent', documentComponent);
 
   return locator;
+}
+
+function getRoutingContext (locator, routeArgs) {
+  const routingContext = {
+    redirect () {
+      const args = routeArgs;
+      const renderer = locator.resolve('documentRenderer');
+
+      return renderer.updateState(Object.assign({}, routingContext, { args }));
+    }
+  };
+
+  return routingContext;
 }
