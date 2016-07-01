@@ -37,6 +37,7 @@ class DocumentRenderer {
     this._config = locator.resolve('config');
 
     this._isUpdating = false;
+    this._silent = false;
     this._currentRoutingContext = null;
     this._state = null;
     this._componentInstances = Object.create(null);
@@ -59,18 +60,20 @@ class DocumentRenderer {
   initWithState (routingContext) {
     return Promise.resolve()
       .then(() => {
-        this._currentRoutingContext = routingContext;
+        this._currentRoutingContext = this._getPatchedRoutingContext(routingContext);
         this._state = new State(this._locator);
 
-        var signal = routingContext.args.signal;
+        var signal = this._currentRoutingContext.args.signal;
 
         if (!signal || !Array.isArray(signal)) {
           return;
         }
 
-        return this._state.signal(signal, routingContext, routingContext.args, this._window.CATBEE_CACHE)
-          .then(() => this._state.tree.commit()); // Tree should clear the updates queue;;
+        return this._state
+          .signal(signal, this._currentRoutingContext, this._currentRoutingContext.args, this._window.CATBEE_CACHE)
+          .then(() => this._state.tree.commit()); // Tree should clear the updates queue
       })
+      .then(() => this._silent = false)
       .then(() => {
         const documentElement = this._window.document.documentElement;
         const action = (element) => this._initializeComponent(element);
@@ -82,16 +85,23 @@ class DocumentRenderer {
   updateState (routingContext) {
     return Promise.resolve()
       .then(() => {
-        this._currentRoutingContext = routingContext;
-        var signal = routingContext.args.signal;
+        this._currentRoutingContext = this._getPatchedRoutingContext(routingContext);
+
+        if (this._silent) {
+          return;
+        }
+
+        var signal = this._currentRoutingContext.args.signal;
 
         if (!signal || !Array.isArray(signal)) {
           return;
         }
 
-        return this._state.signal(signal, routingContext, routingContext.args)
+        return this._state
+          .signal(signal, this._currentRoutingContext, this._currentRoutingContext.args)
           .then(() => this._state.tree.commit()); // Tree should clear the updates queue
       })
+      .then(() => this._silent = false)
       .catch(reason => this._eventBus.emit('error', reason));
   }
 
@@ -815,6 +825,25 @@ class DocumentRenderer {
     }
 
     return `<${element.nodeName} ${attributes.sort().join(' ')}>${element.textContent}</${element.nodeName}>`;
+  }
+
+  /**
+   * Patch redirect method of routingContext for support documentRenderer silent updates
+   * @param {Object} routingContext
+   * @private
+   */
+  _getPatchedRoutingContext (routingContext) {
+    if (!routingContext.redirect) {
+      return routingContext;
+    }
+
+    const redirectMethod = routingContext.redirect;
+    routingContext.redirect = (uriString, options = {}) => {
+      this._silent = options.silent;
+      redirectMethod.call(this, uriString, options);
+    };
+
+    return routingContext;
   }
 }
 
