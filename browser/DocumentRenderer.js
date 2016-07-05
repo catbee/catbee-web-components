@@ -39,7 +39,7 @@ class DocumentRenderer {
     this._isUpdating = false;
     this._silent = false;
     this._currentRoutingContext = null;
-    this._state = null;
+    this._state = new State(locator);
     this._componentInstances = Object.create(null);
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
@@ -61,8 +61,6 @@ class DocumentRenderer {
     return Promise.resolve()
       .then(() => {
         this._currentRoutingContext = this._getPatchedRoutingContext(routingContext);
-        this._state = new State(this._locator);
-
         var signal = this._currentRoutingContext.args.signal;
 
         if (!signal || !Array.isArray(signal)) {
