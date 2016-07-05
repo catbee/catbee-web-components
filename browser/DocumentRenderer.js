@@ -340,6 +340,7 @@ class DocumentRenderer {
     componentContext.collectGarbage = () => this.collectGarbage();
     componentContext.signal = (actions, args) => this._state.signal(actions, this._currentRoutingContext, args);
     componentContext.props = this._getComponentProps(element);
+    componentContext.state = this._state.tree;
 
     componentContext.getWatcherData = () => {
       var watcher = this._componentWatchers[id];
