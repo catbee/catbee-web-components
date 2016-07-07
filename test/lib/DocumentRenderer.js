@@ -1484,12 +1484,146 @@ lab.experiment('lib/DocumentRenderer', () => {
         done();
       });
   });
+
+  lab.test('Should render slot inside another component', (done) => {
+    var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <p>Slot injection</p>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+    class Slot {
+      template () {
+        return '<slot></slot>';
+      }
+    }
+
+    var slot = {
+      constructor: Slot
+    };
+
+    class Document {
+      template () {
+        return html;
+      }
+    }
+
+    var document = {
+      name: 'document',
+      constructor: Document,
+      children: [
+        {
+          name: 'head',
+          component: headComponentMock
+        },
+        {
+          name: 'slot',
+          component: slot
+        }
+      ]
+    };
+
+    var routingContext = createRoutingContext(document);
+    var documentRenderer = routingContext.locator.resolve('documentRenderer');
+    var eventBus = routingContext.locator.resolve('eventBus');
+
+    documentRenderer.render(routingContext);
+
+    var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot><p>Slot injection</p></cat-slot>
+        </body>
+        </html>
+      `;
+
+    routingContext.middleware.response
+      .on('error', done)
+      .on('finish', () => {
+        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+        done();
+      });
+  });
+
+  lab.test('Should render default slot state if slot content not provided', () => {
+    var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot></cat-slot>
+        </body>
+        </html>
+      `;
+
+    class Slot {
+      template () {
+        return '<slot>Default value</slot>';
+      }
+    }
+
+    var slot = {
+      constructor: Slot
+    };
+
+    class Document {
+      template () {
+        return html;
+      }
+    }
+
+    var document = {
+      name: 'document',
+      constructor: Document,
+      children: [
+        {
+          name: 'head',
+          component: headComponentMock
+        },
+        {
+          name: 'slot',
+          component: slot
+        }
+      ]
+    };
+
+    var routingContext = createRoutingContext(document);
+    var documentRenderer = routingContext.locator.resolve('documentRenderer');
+    var eventBus = routingContext.locator.resolve('eventBus');
+
+    documentRenderer.render(routingContext);
+
+    var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>Default value</cat-slot>
+        </body>
+        </html>
+      `;
+
+    routingContext.middleware.response
+      .on('error', done)
+      .on('finish', () => {
+        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+        done();
+      });
+  });
 });
 
 function createRoutingContext(documentDescriptor, args = {}, config = {}) {
   var locator = new ServiceLocator();
   locator.registerInstance('serviceLocator', locator);
-  locator.register('documentRenderer', DocumentRenderer, config, true);
+  locator.register('documentRenderer', DocumentRenderer, true);
   locator.registerInstance('config', config);
 
   var eventBus = new events.EventEmitter();
