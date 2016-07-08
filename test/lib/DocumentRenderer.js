@@ -10,14 +10,13 @@ var DocumentRenderer = require('../../lib/DocumentRenderer');
 
 lab.experiment('lib/DocumentRenderer', () => {
   lab.experiment('#render', () => {
-    lab.test('Should render document with empty state object if signal not passed', (done) => {
+    lab.test('Should render document with empty template', (done) => {
       class Document {
         template () {
           return ``;
         }
 
         render () {
-          assert.deepEqual(this.$context.state.get(), {});
           done();
         }
       }
@@ -179,7 +178,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render components without watchers', (done) => {
+    lab.test('should properly render components', (done) => {
       class AsyncComponent {
         template (context) {
           return `<div>test – ${context.name}</div>`;
@@ -551,53 +550,34 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render component with watchers', (done) => {
+    lab.test('Should render slot inside another component', { only: true }, (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <p>Slot injection</p>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
       class Document {
-        template (context) {
-          return `
-            <!DOCTYPE html>
-            <html>
-            <head></head>
-            <body>
-            document – ${context.name}
-            <cat-empty></cat-empty>
-            </body>
-            </html>
-          `
-        }
-
-        render () {
-          return this.$context;
+        template () {
+          return html;
         }
       }
-
-      class Head {
-        template (context) {
-          return `<title>${context.head}</title>`;
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      class Empty {
-        template (context) {
-          return `empty - ${context.value || 'empty'}`
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      var empty = {
-        constructor: Empty
-      };
-
-      var head = {
-        constructor: Head
-      };
 
       var document = {
         name: 'document',
@@ -605,39 +585,30 @@ lab.experiment('lib/DocumentRenderer', () => {
         children: [
           {
             name: 'head',
-            component: head,
-            watcher: {
-              head: ['head']
-            }
+            component: headComponentMock
           },
           {
-            name: 'empty',
-            component: empty
+            name: 'slot',
+            component: slot
           }
         ]
       };
 
-      var routingContext = createRoutingContext(document, {
-        signal: [
-          function (args, state) {
-            state.set('head', 'Test');
-          }
-        ]
-      });
-
+      var routingContext = createRoutingContext(document);
       var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
       documentRenderer.render(routingContext);
 
       var expected = `
-            <!DOCTYPE html>
-            <html>
-            <head><title>Test</title></head>
-            <body><script>var CATBEE_CACHE = []</script>
-            document – document
-            <cat-empty>empty - empty</cat-empty>
-            </body>
-            </html>
-          `;
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot><p>Slot injection</p></cat-slot>
+        </body>
+        </html>
+      `;
 
       routingContext.middleware.response
         .on('error', done)
@@ -647,53 +618,32 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should render inline script with async actions results', (done) => {
+    lab.test('Should render default slot state if slot content not provided', () => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot></cat-slot>
+        </body>
+        </html>
+      `;
+
+      class Slot {
+        template () {
+          return '<slot>Default value</slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
       class Document {
-        template (context) {
-          return `
-            <!DOCTYPE html>
-            <html>
-            <head></head>
-            <body>
-            document – ${context.name}
-            <cat-empty></cat-empty>
-            </body>
-            </html>
-          `
-        }
-
-        render () {
-          return this.$context;
+        template () {
+          return html;
         }
       }
-
-      class Head {
-        template (context) {
-          return `<title>${context.head}</title>`;
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      class Empty {
-        template (context) {
-          return `empty - ${context.value || 'empty'}`
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      var empty = {
-        constructor: Empty
-      };
-
-      var head = {
-        constructor: Head
-      };
 
       var document = {
         name: 'document',
@@ -701,47 +651,30 @@ lab.experiment('lib/DocumentRenderer', () => {
         children: [
           {
             name: 'head',
-            component: head,
-            watcher: {
-              head: ['head']
-            }
+            component: headComponentMock
           },
           {
-            name: 'empty',
-            component: empty
+            name: 'slot',
+            component: slot
           }
         ]
       };
 
-      var routingContext = createRoutingContext(document, {
-        signal: [
-          function (args, state) {
-            state.set('head', 'Test');
-          },
-          [
-            function (args, state, output) {
-              output.success({ test: 'test' });
-            },
-            {
-              success: []
-            }
-          ]
-        ]
-      });
-
+      var routingContext = createRoutingContext(document);
       var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
       documentRenderer.render(routingContext);
 
       var expected = `
-            <!DOCTYPE html>
-            <html>
-            <head><title>Test</title></head>
-            <body><script>var CATBEE_CACHE = [{"outputPath":[1,0],"path":"success","args":{"test":"test"}}]</script>
-            document – document
-            <cat-empty>empty - empty</cat-empty>
-            </body>
-            </html>
-          `;
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>Default value</cat-slot>
+        </body>
+        </html>
+      `;
 
       routingContext.middleware.response
         .on('error', done)
@@ -1193,430 +1126,6 @@ lab.experiment('lib/DocumentRenderer', () => {
           done();
         });
     });
-
-    lab.test('should render with errors in signal', (done) => {
-      class Document {
-        template (context) {
-          return `
-            <!DOCTYPE html>
-            <html>
-            <head></head>
-            <body>
-            document – ${context.name}
-            <cat-empty></cat-empty>
-            </body>
-            </html>
-          `
-        }
-
-        render () {
-          return this.$context;
-        }
-      }
-
-      class Head {
-        template (context) {
-          return `<title>${context.head}</title>`;
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      class Empty {
-        template (context) {
-          return `empty - ${context.value || 'empty'}`
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      var empty = {
-        constructor: Empty
-      };
-
-      var head = {
-        constructor: Head
-      };
-
-      var document = {
-        name: 'document',
-        constructor: Document,
-        children: [
-          {
-            name: 'head',
-            component: head,
-            watcher: {
-              head: ['head']
-            }
-          },
-          {
-            name: 'empty',
-            component: empty
-          }
-        ]
-      };
-
-      var signalError = 'signal error';
-
-      var routingContext = createRoutingContext(document, {
-        signal: [
-          function (args, state) {
-            state.set('head', 'Test');
-          },
-          function () {
-            throw signalError;
-          }
-        ]
-      });
-
-      var documentRenderer = routingContext.locator.resolve('documentRenderer');
-      documentRenderer._eventBus.on('error', (error) => assert.strictEqual(error, signalError));
-      documentRenderer.render(routingContext);
-
-      var expected = `
-            <!DOCTYPE html>
-            <html>
-            <head><title>Test</title></head>
-            <body>
-            document – document
-            <cat-empty>empty - empty</cat-empty>
-            </body>
-            </html>
-          `;
-
-      routingContext.middleware.response
-        .on('error', done)
-        .on('finish', () => {
-          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
-          done();
-        });
-
-    });
-
-    lab.test('should render with props and parent props data', (done) => {
-      const testText = 'test';
-
-      var html = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-parent></cat-parent>
-        </body>
-        </html>
-      `;
-
-      class Current {
-        template (ctx) {
-          return `${ctx.text}`;
-        }
-
-        render () {
-          return {
-            text: this.$context.props.text
-          }
-        }
-      }
-
-      const current = {
-        constructor: Current
-      };
-
-      class Parent {
-        template () {
-          return `<cat-current></cat-current>`
-        }
-
-        render () {
-          return {
-            id: Number(this.$context.attributes['id']) + 1
-          };
-        }
-      }
-
-      var parent = {
-        constructor: Parent,
-        children: [
-          {
-            name: 'current',
-            component: current,
-            parentPropsMap: {
-              text: 'field'
-            }
-          }
-        ]
-      };
-
-      class Document {
-        template () {
-          return html;
-        }
-      }
-
-      var document = {
-        name: 'document',
-        constructor: Document,
-        children: [
-          {
-            name: 'head',
-            component: headComponentMock
-          },
-          {
-            name: 'parent',
-            component: parent,
-            props: {
-              field: testText
-            }
-          }
-        ]
-      };
-
-      var routingContext = createRoutingContext(document);
-      var documentRenderer = routingContext.locator.resolve('documentRenderer');
-      var eventBus = routingContext.locator.resolve('eventBus');
-
-      const expected = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-parent><cat-current>test</cat-current></cat-parent>
-        </body>
-        </html>
-      `;
-
-      eventBus
-        .on('error', done);
-
-      documentRenderer.render(routingContext);
-
-      routingContext.middleware.response
-        .on('finish', () => {
-          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
-          done();
-        })
-        .on('error', done);
-    });
-  });
-
-  lab.test('should render recursive components', (done) => {
-    var html = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-recursive id="1"></cat-recursive>
-        </body>
-        </html>
-      `;
-
-    class Recursive {
-      template (ctx) {
-        if (ctx.id > 10) {
-          return;
-        }
-
-        return `<cat-recursive id="${ctx.id}"></cat-recursive>`;
-      }
-
-      render () {
-        return {
-          id: Number(this.$context.attributes['id']) + 1
-        };
-      }
-    }
-
-    var recursive = {
-      constructor: Recursive,
-      children: [
-        {
-          name: 'recursive',
-          recursive: true
-        }
-      ]
-    };
-
-    class Document {
-      template () {
-        return html;
-      }
-    }
-
-    var document = {
-      name: 'document',
-      constructor: Document,
-      children: [
-        {
-          name: 'head',
-          component: headComponentMock
-        },
-        {
-          name: 'recursive',
-          component: recursive
-        }
-      ]
-    };
-
-    var routingContext = createRoutingContext(document);
-    var documentRenderer = routingContext.locator.resolve('documentRenderer');
-    var eventBus = routingContext.locator.resolve('eventBus');
-
-    documentRenderer.render(routingContext);
-
-    var expected = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-recursive id="1"><cat-recursive id="2"><cat-recursive id="3"><cat-recursive id="4"><cat-recursive id="5"><cat-recursive id="6"><cat-recursive id="7"><cat-recursive id="8"><cat-recursive id="9"><cat-recursive id="10">undefined</cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive>
-        </body>
-        </html>
-      `;
-
-    routingContext.middleware.response
-      .on('error', done)
-      .on('finish', () => {
-        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
-        done();
-      });
-  });
-
-  lab.test('Should render slot inside another component', (done) => {
-    var html = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-slot>
-            <p>Slot injection</p>
-          </cat-slot>
-        </body>
-        </html>
-      `;
-
-    class Slot {
-      template () {
-        return '<slot></slot>';
-      }
-    }
-
-    var slot = {
-      constructor: Slot
-    };
-
-    class Document {
-      template () {
-        return html;
-      }
-    }
-
-    var document = {
-      name: 'document',
-      constructor: Document,
-      children: [
-        {
-          name: 'head',
-          component: headComponentMock
-        },
-        {
-          name: 'slot',
-          component: slot
-        }
-      ]
-    };
-
-    var routingContext = createRoutingContext(document);
-    var documentRenderer = routingContext.locator.resolve('documentRenderer');
-    var eventBus = routingContext.locator.resolve('eventBus');
-
-    documentRenderer.render(routingContext);
-
-    var expected = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-slot><p>Slot injection</p></cat-slot>
-        </body>
-        </html>
-      `;
-
-    routingContext.middleware.response
-      .on('error', done)
-      .on('finish', () => {
-        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
-        done();
-      });
-  });
-
-  lab.test('Should render default slot state if slot content not provided', () => {
-    var html = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-slot></cat-slot>
-        </body>
-        </html>
-      `;
-
-    class Slot {
-      template () {
-        return '<slot>Default value</slot>';
-      }
-    }
-
-    var slot = {
-      constructor: Slot
-    };
-
-    class Document {
-      template () {
-        return html;
-      }
-    }
-
-    var document = {
-      name: 'document',
-      constructor: Document,
-      children: [
-        {
-          name: 'head',
-          component: headComponentMock
-        },
-        {
-          name: 'slot',
-          component: slot
-        }
-      ]
-    };
-
-    var routingContext = createRoutingContext(document);
-    var documentRenderer = routingContext.locator.resolve('documentRenderer');
-    var eventBus = routingContext.locator.resolve('eventBus');
-
-    documentRenderer.render(routingContext);
-
-    var expected = `
-        <!DOCTYPE html>
-        <html>
-          <head></head>
-        <body>
-          <cat-slot>Default value</cat-slot>
-        </body>
-        </html>
-      `;
-
-    routingContext.middleware.response
-      .on('error', done)
-      .on('finish', () => {
-        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
-        done();
-      });
   });
 });
 

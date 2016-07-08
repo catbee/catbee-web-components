@@ -1,7 +1,6 @@
 var morphdom = require('morphdom');
 var errorHelper = require('../lib/helpers/errorHelper');
 var moduleHelper = require('../lib/helpers/moduleHelper');
-var State = require('../lib/State');
 var uuid = require('uuid');
 
 const SPECIAL_IDS = {
@@ -39,22 +38,12 @@ class DocumentRenderer {
     this._isUpdating = false;
     this._silent = false;
     this._currentRoutingContext = null;
-    this._state = new State(locator);
     this._componentInstances = Object.create(null);
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
     this._componentWatchers = Object.create(null);
     this._localContextRegistry = Object.create(null);
     this._currentChangedComponents = Object.create(null);
-
-    this._eventBus.on('componentStateChanged', (componentId) => {
-      this._currentChangedComponents[componentId] = true;
-
-      // We must wait next tick, before we run update.
-      // It allows to collect all sync update events
-      Promise.resolve()
-        .then(() => this._updateComponents());
-    });
   }
 
   initWithState (routingContext) {
