@@ -36,31 +36,15 @@ class DocumentRenderer {
     this._config = locator.resolve('config');
 
     this._isUpdating = false;
-    this._silent = false;
     this._currentRoutingContext = null;
     this._componentInstances = Object.create(null);
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
-    this._componentWatchers = Object.create(null);
-    this._localContextRegistry = Object.create(null);
     this._currentChangedComponents = Object.create(null);
   }
 
-  initWithState (routingContext) {
+  initWithState () {
     return Promise.resolve()
-      .then(() => {
-        this._currentRoutingContext = this._getPatchedRoutingContext(routingContext);
-        var signal = this._currentRoutingContext.args.signal;
-
-        if (!signal || !Array.isArray(signal)) {
-          return;
-        }
-
-        return this._state
-          .signal(signal, this._currentRoutingContext, this._currentRoutingContext.args, this._window.CATBEE_CACHE)
-          .then(() => this._state.tree.commit()); // Tree should clear the updates queue
-      })
-      .then(() => this._silent = false)
       .then(() => {
         const documentElement = this._window.document.documentElement;
         const action = (element) => this._initializeComponent(element);
@@ -69,42 +53,18 @@ class DocumentRenderer {
       .catch(reason => this._eventBus.emit('error', reason));
   }
 
-  updateState (routingContext) {
+  updateState () {
     return Promise.resolve()
       .then(() => {
-        this._currentRoutingContext = this._getPatchedRoutingContext(routingContext);
 
-        if (this._silent) {
-          return;
-        }
-
-        var signal = this._currentRoutingContext.args.signal;
-
-        if (!signal || !Array.isArray(signal)) {
-          return;
-        }
-
-        return this._state
-          .signal(signal, this._currentRoutingContext, this._currentRoutingContext.args)
-          .then(() => this._state.tree.commit()); // Tree should clear the updates queue
       })
-      .then(() => this._silent = false)
       .catch(reason => this._eventBus.emit('error', reason));
   }
 
-  renderComponent (element, rootComponentDescriptor, renderingContext) {
+  renderComponent (element, renderingContext) {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
-        const componentName = moduleHelper.getOriginalComponentName(element.tagName);
-        var rootComponentContext;
-
-        if (rootComponentDescriptor) {
-          rootComponentContext = {
-            name: componentName,
-            component: rootComponentDescriptor
-          };
-        }
 
         if (!renderingContext) {
           renderingContext = this._createRenderingContext();
@@ -112,11 +72,6 @@ class DocumentRenderer {
         }
 
         const hadChildrenNodes = (element.children.length > 0);
-        const localContext = this._generateLocalContext(element, rootComponentContext);
-
-        if (!localContext) {
-          return null;
-        }
 
         renderingContext.renderedIds[id] = true;
 
@@ -143,7 +98,6 @@ class DocumentRenderer {
             return this._unbindAll(element, renderingContext);
           })
           .catch(reason => this._eventBus.emit('error', reason))
-          .then(() => this._bindWatcher(localContext, element))
           .then(() => {
             const renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
             return moduleHelper.getSafePromise(renderMethod);
@@ -264,45 +218,6 @@ class DocumentRenderer {
     return this._componentInstances[id] || null;
   }
 
-  _generateLocalContext (element, rootElementContext) {
-    const componentId = this._getId(element);
-
-    if (rootElementContext) {
-      this._localContextRegistry[componentId] = rootElementContext;
-      return contextToDescriptor(rootElementContext);
-    } else {
-      const componentName = moduleHelper.getOriginalComponentName(element.tagName);
-      const parentComponent = findParentComponent(element);
-
-      // All descendant components must get context from the parent node
-      if (!parentComponent) {
-        return;
-      }
-
-      const parentId = this._getId(parentComponent);
-      const parentContext = this._localContextRegistry[parentId];
-
-      // If component is not described in the parent node, it can't be rendered
-      if (!parentContext || !parentContext.component.children) {
-        return;
-      }
-
-      // Extend local registry
-      var componentContext = parentContext.component.children.find((child) => child.name === componentName);
-
-      if (!componentContext) {
-        return;
-      }
-
-      if (componentContext.recursive) {
-        componentContext = parentContext;
-      }
-
-      this._localContextRegistry[componentId] = componentContext;
-      return contextToDescriptor(componentContext);
-    }
-  }
-
   _getComponentContext (element) {
     const componentContext = Object.create(this._currentRoutingContext);
     const name = moduleHelper.getOriginalComponentName(element.tagName);
@@ -322,50 +237,10 @@ class DocumentRenderer {
     componentContext.element = element;
     componentContext.getComponentById = (id) => this.getComponentById(id);
     componentContext.getComponentByElement = (element) => this.getComponentByElement(element);
-    componentContext.createComponent = (tagName, descriptor, attributes) =>
-      this.createComponent(tagName, descriptor, attributes);
+    componentContext.createComponent = (...args) => this.createComponent(...args);
     componentContext.collectGarbage = () => this.collectGarbage();
-    componentContext.signal = (actions, args) => this._state.signal(actions, this._currentRoutingContext, args);
-    componentContext.props = this._getComponentProps(element);
-    componentContext.state = this._state.tree;
-
-    componentContext.getWatcherData = () => {
-      var watcher = this._componentWatchers[id];
-
-      if (!watcher) {
-        return Promise.resolve();
-      }
-
-      return Promise.resolve(
-        watcher.get()
-      );
-    };
 
     return Object.freeze(componentContext);
-  }
-
-  _getComponentProps (element) {
-    const id = this._getId(element);
-    const descriptor = this._localContextRegistry[id];
-    const componentProps = descriptor.props || Object.create(null);
-    const parentPropsMap = descriptor.parentPropsMap;
-
-    if (typeof parentPropsMap === 'object') {
-      const parentElement = findParentComponent(element);
-      const parentId = this._getId(parentElement);
-      const parentProps = this._localContextRegistry[parentId].props || Object.create(null);
-
-      Object
-        .keys(parentPropsMap)
-        .forEach((key) => {
-          const property = parentProps[parentPropsMap[key]];
-          if (property) {
-            componentProps[key] = property;
-          }
-        });
-    }
-
-    return componentProps;
   }
 
   _createRenderingContext (changedComponentsIds) {
@@ -428,22 +303,6 @@ class DocumentRenderer {
         const id = this._getId(element);
         const componentName = moduleHelper.getOriginalComponentName(element.tagName);
         const isDocument = moduleHelper.isDocumentComponent(componentName);
-        var rootContext;
-
-        if (isDocument) {
-          var documentComponentDescriptor = this._locator.resolve('documentComponent');
-
-          rootContext = {
-            name: 'document',
-            component: documentComponentDescriptor
-          };
-        }
-
-        const localContext = this._generateLocalContext(element, rootContext);
-
-        if (!localContext) {
-          return;
-        }
 
         const ComponentConstructor = localContext.constructor;
         ComponentConstructor.prototype.$context = this._getComponentContext(element);
@@ -454,8 +313,7 @@ class DocumentRenderer {
         this._componentElements[id] = element;
         this._componentInstances[id] = instance;
 
-        return this._bindWatcher(localContext, element)
-          .then(() => this._bindComponent(element));
+        return this._bindComponent(element);
       });
   }
 
@@ -510,26 +368,6 @@ class DocumentRenderer {
       });
   }
 
-  _bindWatcher (localContext, element) {
-    var id = this._getId(element);
-    var attributes = attributesToObject(element.attributes);
-    var watcherDefinition = localContext.watcher;
-
-    if (!watcherDefinition) {
-      return Promise.resolve();
-    }
-
-    if (typeof watcherDefinition === 'function') {
-      watcherDefinition = watcherDefinition.apply(null, [attributes]);
-    }
-
-    var watcher = this._state.getWatcher(watcherDefinition);
-    watcher.on('update', () => this._eventBus.emit('componentStateChanged', id));
-    this._componentWatchers[id] = watcher;
-
-    return Promise.resolve();
-  }
-
   _createBindingHandler (componentRoot, selectorHandlers) {
     const selectors = Object.keys(selectorHandlers);
 
@@ -576,8 +414,7 @@ class DocumentRenderer {
     const action = (innerElement) => {
       const id = this._getId(innerElement);
       renderingContext.unboundIds[id] = true;
-      return this._unbindComponent(innerElement)
-        .then(() => this._unbindWatcher(id));
+      return this._unbindComponent(innerElement);
     };
 
     return this._traverseComponents([element], action);
@@ -606,18 +443,6 @@ class DocumentRenderer {
     const unbindMethod = moduleHelper.getMethodToInvoke(instance, 'unbind');
     return moduleHelper.getSafePromise(unbindMethod)
       .catch(reason => this._eventBus.emit('error', reason));
-  }
-
-  _unbindWatcher (id) {
-    var watcher = this._componentWatchers[id];
-
-    if (!watcher) {
-      return;
-    }
-
-    watcher.off('update');
-    watcher.release();
-    delete this._componentWatchers[id];
   }
 
   _collectRenderingGarbage (renderingContext) {
@@ -651,7 +476,6 @@ class DocumentRenderer {
   _removeDetachedComponent (element) {
     const id = this._getId(element);
     return this._unbindComponent(element)
-      .then(() => this._unbindWatcher(id))
       .then(() => this._removeComponentById(id));
   }
 
@@ -814,25 +638,6 @@ class DocumentRenderer {
 
     return `<${element.nodeName} ${attributes.sort().join(' ')}>${element.textContent}</${element.nodeName}>`;
   }
-
-  /**
-   * Patch redirect method of routingContext for support documentRenderer silent updates
-   * @param {Object} routingContext
-   * @private
-   */
-  _getPatchedRoutingContext (routingContext) {
-    if (!routingContext.redirect) {
-      return routingContext;
-    }
-
-    const redirectMethod = routingContext.redirect;
-    routingContext.redirect = (uriString, options = {}) => {
-      this._silent = options.silent;
-      redirectMethod.call(routingContext, uriString, options);
-    };
-
-    return routingContext;
-  }
 }
 
 function createCustomEvent (event, currentTargetGetter) {
@@ -894,13 +699,6 @@ function findParentComponent (element) {
   }
 
   return null;
-}
-
-function contextToDescriptor (context) {
-  return Object.assign({
-    name: context.name,
-    watcher: context.watcher
-  }, context.component)
 }
 
 function attributesToObject (attributes) {
