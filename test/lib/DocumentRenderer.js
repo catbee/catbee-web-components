@@ -8,7 +8,7 @@ var ServerResponse = require('../mocks/ServerResponse');
 var headComponentMock = require('../mocks/HeadComponent');
 var DocumentRenderer = require('../../lib/DocumentRenderer');
 
-lab.experiment('lib/DocumentRenderer', () => {
+lab.experiment('lib/DocumentRenderer', { only:true }, () => {
   lab.experiment('#render', () => {
     lab.test('Should render document with empty template', (done) => {
       class Document {
@@ -550,7 +550,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('Should render slot inside another component', { only: true }, (done) => {
+    lab.test('Should render slot inside another component', (done) => {
       var html = `
         <!DOCTYPE html>
         <html>
@@ -605,7 +605,9 @@ lab.experiment('lib/DocumentRenderer', () => {
         <html>
           <head></head>
         <body>
-          <cat-slot><p>Slot injection</p></cat-slot>
+          <cat-slot>
+            <p>Slot injection</p>
+          </cat-slot>
         </body>
         </html>
       `;
@@ -618,7 +620,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('Should render default slot state if slot content not provided', () => {
+    lab.test('Should render default slot state if slot content not provided', (done) => {
       var html = `
         <!DOCTYPE html>
         <html>
@@ -672,6 +674,190 @@ lab.experiment('lib/DocumentRenderer', () => {
           <head></head>
         <body>
           <cat-slot>Default value</cat-slot>
+        </body>
+        </html>
+      `;
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('Should use parent context for components that defined in slot', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <cat-inner-slot></cat-inner-slot>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class InnerSlot {
+        template () {
+          return 'Inner Slot';
+        }
+      }
+
+      var innerSlot = {
+        constructor: InnerSlot
+      };
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'inner-slot',
+            component: innerSlot
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <cat-inner-slot>Inner Slot</cat-inner-slot>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('Should properly render nested slot components', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <cat-inner-slot></cat-inner-slot>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class InnerSlotChild {
+        template () {
+          return 'Inner Slot Child';
+        }
+      }
+
+      var innerSlotChild = {
+        constructor: InnerSlotChild
+      };
+
+      class InnerSlot {
+        template () {
+          return '<cat-inner-slot-child></cat-inner-slot-child>';
+        }
+      }
+
+      var innerSlot = {
+        constructor: InnerSlot,
+        children: [
+          {
+            name: 'inner-slot-child',
+            component: innerSlotChild
+          }
+        ]
+      };
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'inner-slot',
+            component: innerSlot
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <cat-inner-slot><cat-inner-slot-child>Inner Slot Child</cat-inner-slot-child></cat-inner-slot>
+          </cat-slot>
         </body>
         </html>
       `;
