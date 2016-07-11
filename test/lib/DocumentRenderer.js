@@ -1513,7 +1513,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('Should render with props and parent props data', (done) => {
+    lab.test('Should correct pass props between components', (done) => {
       const testText = 'test';
       var html = `
         <!DOCTYPE html>

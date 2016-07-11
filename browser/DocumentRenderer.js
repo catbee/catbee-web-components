@@ -1,7 +1,11 @@
-var morphdom = require('morphdom');
-var errorHelper = require('../lib/helpers/errorHelper');
-var moduleHelper = require('../lib/helpers/moduleHelper');
-var uuid = require('uuid');
+const morphdom = require('morphdom');
+const errorHelper = require('../lib/helpers/errorHelper');
+const moduleHelper = require('../lib/helpers/moduleHelper');
+const uuid = require('uuid');
+const LocalContextProvider = require('../lib/LocalContextProvider');
+const StateManager = require('../lib/StateManager');
+
+const ERROR_MISSED_REQUIRED_COMPONENTS = 'Document component is not register.';
 
 const SPECIAL_IDS = {
   $$head: '$$head',
@@ -41,16 +45,40 @@ class DocumentRenderer {
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
     this._currentChangedComponents = Object.create(null);
+
+    this._localContextProvider = new LocalContextProvider();
+    this._stateManager = new StateManager(locator);
   }
 
-  initWithState () {
+  initWithState (routingContext) {
+    const { args } = routingContext;
+    const { signal } = args;
+    const document = this._locator.resolve('documentComponent');
+
+    if (!document) {
+      this._eventBus.emit('error', ERROR_MISSED_REQUIRED_COMPONENTS);
+      return;
+    }
+
+    this._currentRoutingContext = routingContext;
+    this._stateManager.setRountingContext(routingContext);
+
     return Promise.resolve()
       .then(() => {
+        if (!signal) {
+          return;
+        }
+
+        return this._stateManager.signal(signal, args, this._window.CATBEE_CACHE);
+      })
+      .then(() => {
+        this._stateManager.tree.commit();
+        this._localContextProvider.setContext(document, SPECIAL_IDS.$$document); // Set root context
         const documentElement = this._window.document.documentElement;
         const action = (element) => this._initializeComponent(element);
         return this._traverseComponents([documentElement], action);
       })
-      .catch(reason => this._eventBus.emit('error', reason));
+      .catch((e) => this._eventBus.emit('error', e));
   }
 
   updateState () {
@@ -58,7 +86,7 @@ class DocumentRenderer {
       .then(() => {
 
       })
-      .catch(reason => this._eventBus.emit('error', reason));
+      .catch((e) => this._eventBus.emit('error', e));
   }
 
   renderComponent (element, renderingContext) {
@@ -301,8 +329,7 @@ class DocumentRenderer {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
-        const componentName = moduleHelper.getOriginalComponentName(element.tagName);
-        const isDocument = moduleHelper.isDocumentComponent(componentName);
+        const localContext = this._localContextProvider.getCurrentContextComponent();
 
         const ComponentConstructor = localContext.constructor;
         ComponentConstructor.prototype.$context = this._getComponentContext(element);

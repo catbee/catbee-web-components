@@ -11,7 +11,7 @@ var ModuleApiProvider = require('../mocks/ModuleApiProvider');
 
 lab.experiment('browser/DocumentRenderer', () => {
   lab.experiment('#initWithState', () => {
-    lab.test('should init and bind all components in right order', (done) => {
+    lab.test('should init and bind all components in right order', { only: true }, (done) => {
       var html = fs.readFileSync(__dirname + '/../cases/browser/DocumentRenderer/initWithState.html');
       var bindCalls = [];
 
