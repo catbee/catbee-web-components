@@ -35,6 +35,10 @@ const NON_BUBBLING_EVENTS = {
 };
 
 class DocumentRenderer {
+  /**
+   * Creates a new instance of the document renderer.
+   * @param {ServiceLocator} locator - Locator for resolving dependencies.
+   */
   constructor (locator) {
     this._locator = locator;
     this._window = locator.resolve('window');
@@ -64,6 +68,11 @@ class DocumentRenderer {
     });
   }
 
+  /**
+   * Sets the initial state of the application.
+   * @param {Object} routingContext - Routing context.
+   * @returns {Promise} Promise for nothing.
+   */
   initWithState (routingContext) {
     const { args } = routingContext;
     const { signal } = args;
@@ -97,6 +106,11 @@ class DocumentRenderer {
       .catch((e) => this._eventBus.emit('error', e));
   }
 
+  /**
+   * Renders a new state of the application.
+   * @param {Object} routingContext - Routing context.
+   * @returns {Promise} Promise for nothing.
+   */
   updateState (routingContext) {
     const { args } = routingContext;
     const { signal } = args;
@@ -120,6 +134,12 @@ class DocumentRenderer {
       .catch((e) => this._eventBus.emit('error', e));
   }
 
+  /**
+   * Renders a component into the HTML element.
+   * @param {Element} element - HTML element of the component.
+   * @param {Object} rootDescriptor - Root component descriptor
+   * @param {Object?} renderingContext - Rendering context for group rendering.
+   */
   renderComponent (element, rootDescriptor, renderingContext) {
     return Promise.resolve()
       .then(() => {
@@ -220,6 +240,11 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Checks that every instance of the component has an element on the page and
+   * removes all references to those components which were removed from DOM.
+   * @returns {Promise} Promise for nothing.
+   */
   collectGarbage () {
     return Promise.resolve()
       .then(() => {
@@ -253,6 +278,12 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Creates and renders a component element.
+   * @param {string} tagName - Name of the HTML tag.
+   * @param {Object?} attributes - Element attributes.
+   * @returns {Promise<Element>} Promise for HTML element with the rendered component.
+   */
   createComponent (tagName, component, attributes = {}) {
     if (typeof (tagName) !== 'string' || (typeof (attributes) !== 'object' || Array.isArray(attributes))) {
       return Promise.reject(
@@ -281,11 +312,21 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Gets a component instance by ID.
+   * @param {string} id Component's element ID.
+   * @returns {Object|null} Component instance.
+   */
   getComponentById (id) {
     const element = this._window.document.getElementById(id);
     return this.getComponentByElement(element);
   }
 
+  /**
+   * Gets component instance by a DOM element.
+   * @param {Element} element Component's Element.
+   * @returns {Object|null} Component instance.
+   */
   getComponentByElement (element) {
     if (!element) {
       return null;
@@ -297,6 +338,13 @@ class DocumentRenderer {
     return this._componentInstances[id] || null;
   }
 
+  /**
+   * Gets a component context using the basic context.
+   * @param {Object} localContext - Component details.
+   * @param {Element} element - DOM element of the component.
+   * @returns {Object} Component's context.
+   * @private
+   */
   _getComponentContext (localContext, element) {
     const componentContext = Object.create(this._currentRoutingContext);
     const name = moduleHelper.getOriginalComponentName(element.tagName);
@@ -338,6 +386,12 @@ class DocumentRenderer {
     return Object.freeze(componentContext);
   }
 
+  /**
+   * Creates a rendering context.
+   * @param {Array?} changedComponentsIds
+   * @returns {Object} The context object.
+   * @private
+   */
   _createRenderingContext (changedComponentsIds) {
     return {
       config: this._config,
@@ -351,6 +405,13 @@ class DocumentRenderer {
     };
   }
 
+  /**
+   * Does asynchronous traversal through the components hierarchy.
+   * @param {Array} elements - Elements to start the search.
+   * @param {Function} action - Action for every component.
+   * @returns {Promise} Promise for the finished traversal.
+   * @private
+   */
   _traverseComponents (elements, action) {
     if (elements.length === 0) {
       return Promise.resolve();
@@ -366,6 +427,11 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Finds all descendant components of the specified component root.
+   * @param {Element} root - Root component's HTML root to begin search with.
+   * @private
+   */
   _findNestedComponents (root) {
     const elements = [];
     const queue = [root];
@@ -392,6 +458,12 @@ class DocumentRenderer {
     return elements;
   }
 
+  /**
+   * Initializes the element as a component.
+   * @param {Element} element - The component's element.
+   * @returns {Promise} Promise for the done initialization.
+   * @private
+   */
   _initializeComponent (element) {
     return Promise.resolve()
       .then(() => {
@@ -429,6 +501,12 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Binds all required event handlers to the component.
+   * @param {Element} element - Component's HTML element.
+   * @returns {Promise} Promise for nothing.
+   * @private
+   */
   _bindComponent (element) {
     const id = this._getId(element);
     const instance = this._componentInstances[id];
@@ -480,6 +558,13 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Bind state tree watcher
+   * @param {Object} localContext - Component details.
+   * @param {Element} element - Component's HTML element.
+   * @returns {Promise}
+   * @private
+   */
   _bindWatcher (localContext, element) {
     return Promise.resolve()
       .then(() => {
@@ -501,6 +586,13 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Creates a universal event handler for delegated events.
+   * @param {Element} componentRoot - Root element of the component.
+   * @param {Object} selectorHandlers - Map of event handlers by their CSS selectors.
+   * @returns {Function} Universal event handler for delegated events.
+   * @private
+   */
   _createBindingHandler (componentRoot, selectorHandlers) {
     const selectors = Object.keys(selectorHandlers);
 
@@ -533,6 +625,14 @@ class DocumentRenderer {
     };
   }
 
+  /**
+   * Tries to dispatch an event.
+   * @param {Array} selectors - The list of supported selectors.
+   * @param {Function} matchPredicate - The function to check if selector matches.
+   * @param {Object} handlers - The set of handlers for events.
+   * @param {Event} event - The DOM event object.
+   * @private
+   */
   _tryDispatchEvent (selectors, matchPredicate, handlers, event) {
     return selectors.some(selector => {
       if (!matchPredicate(selector)) {
@@ -543,6 +643,13 @@ class DocumentRenderer {
     });
   }
 
+  /**
+   * Unbinds all event handlers from the specified component and all it's descendants.
+   * @param {Element} element - Component HTML element.
+   * @param {Object} renderingContext - Context of rendering.
+   * @returns {Promise} Promise for nothing.
+   * @private
+   */
   _unbindAll (element, renderingContext) {
     const action = (innerElement) => {
       const id = this._getId(innerElement);
@@ -554,6 +661,12 @@ class DocumentRenderer {
     return this._traverseComponents([element], action);
   }
 
+  /**
+   * Unbinds all event handlers from the specified component.
+   * @param {Element} element - Component HTML element.
+   * @returns {Promise} Promise for nothing.
+   * @private
+   */
   _unbindComponent (element) {
     const id = this._getId(element);
     const instance = this._componentInstances[id];
@@ -579,6 +692,11 @@ class DocumentRenderer {
       .catch(reason => this._eventBus.emit('error', reason));
   }
 
+  /**
+   * Unbind state tree watcher.
+   * @param {String} id - Component's ID.
+   * @private
+   */
   _unbindWatcher (id) {
     var watcher = this._componentWatchers[id];
 
@@ -591,6 +709,11 @@ class DocumentRenderer {
     delete this._componentWatchers[id];
   }
 
+  /**
+   * Clears all references to removed components during the rendering process.
+   * @param {Object} renderingContext Context of rendering.
+   * @private
+   */
   _collectRenderingGarbage (renderingContext) {
     Object.keys(renderingContext.unboundIds)
       .forEach(id => {
@@ -604,12 +727,23 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Removes a component from the current list.
+   * @param {String} id - Component's ID.
+   * @private
+   */
   _removeComponentById (id) {
     delete this._componentElements[id];
     delete this._componentInstances[id];
     delete this._componentBindings[id];
   }
 
+  /**
+   * Removes detached subtrees from the components set.
+   * @param {{roots: Array, components: Object}} context Operation context.
+   * @returns {Promise} Promise for finished removal.
+   * @private
+   */
   _removeDetachedComponents (context) {
     if (context.roots.length === 0) {
       return Promise.resolve();
@@ -619,12 +753,27 @@ class DocumentRenderer {
       .then(() => this._removeDetachedComponents(context));
   }
 
+  /**
+   * Removes detached component.
+   * @param {Element} element - Element of the detached component.
+   * @returns {Promise} Promise for the removed component.
+   * @private
+   */
   _removeDetachedComponent (element) {
     const id = this._getId(element);
     return this._unbindComponent(element)
       .then(() => this._removeComponentById(id));
   }
 
+  /**
+   * Merges new and existed head elements and applies only difference.
+   * The problem here is that we can't re-create or change script and style tags,
+   * because it causes blinking and JavaScript re-initialization. Therefore such
+   * element must be immutable in the HEAD.
+   * @param {Node} head - HEAD DOM element.
+   * @param {Node} newHead - New HEAD element.
+   * @private
+   */
   _mergeHead (head, newHead) {
     if (!newHead) {
       return;
@@ -658,6 +807,11 @@ class DocumentRenderer {
     }
   }
 
+  /**
+   * Render current queue of changed components.
+   * @returns {Promise} Promise for nothing.
+   * @private
+   */
   _updateComponents () {
     if (this._isUpdating) {
       return Promise.resolve();
@@ -683,6 +837,12 @@ class DocumentRenderer {
       });
   }
 
+  /**
+   * Finds all rendering roots on the page for all changed stores.
+   * @param {Array} [changedComponentsIds=[]] - List of changed store's names.
+   * @returns {Array<Element>} HTML elements that are rendering roots.
+   * @private
+   */
   _findRenderingRoots (changedComponentsIds = []) {
     var lastRoot;
     var lastRootId;
@@ -729,6 +889,13 @@ class DocumentRenderer {
     return roots;
   }
 
+  /**
+   * Handles an error while rendering.
+   * @param {Element} element - Component's HTML element.
+   * @param {Error} error - Error to handle.
+   * @returns {Promise<string>} Promise for HTML string.
+   * @private
+   */
   _handleRenderError (element, error) {
     this._eventBus.emit('error', error);
 
@@ -748,6 +915,11 @@ class DocumentRenderer {
       .catch(() => '');
   }
 
+  /**
+   * Gets an ID of the element.
+   * @param {Element} element - HTML element of the component.
+   * @returns {String} ID.
+   */
   _getId (element) {
     if (element === this._window.document.documentElement) {
       return SPECIAL_IDS.$$document;
@@ -768,6 +940,12 @@ class DocumentRenderer {
     return element[moduleHelper.COMPONENT_ID];
   }
 
+  /**
+   * Gets an unique element key using element's attributes and its content.
+   * @param {Element} element - HTML element.
+   * @returns {string} Unique key for the element.
+   * @private
+   */
   _getElementKey (element) {
     // some immutable elements have several valuable attributes
     // these attributes define the element identity
@@ -802,6 +980,12 @@ class DocumentRenderer {
   }
 }
 
+/**
+ * Creates an imitation of the original Event object but with specified currentTarget.
+ * @param {Event} event - Original event object.
+ * @param {Function} currentTargetGetter - Getter for the currentTarget.
+ * @returns {Event} Wrapped event.
+ */
 function createCustomEvent (event, currentTargetGetter) {
   const catEvent = Object.create(event);
   const keys = [];
@@ -838,6 +1022,11 @@ function createCustomEvent (event, currentTargetGetter) {
   return catEvent;
 }
 
+/**
+ * Gets a cross-browser "matches" method for the element.
+ * @param {Element} element - HTML element.
+ * @returns {Function} "matches" method.
+ */
 function getMatchesMethod (element) {
   const method = (element.matches ||
   element.webkitMatchesSelector ||
@@ -848,6 +1037,11 @@ function getMatchesMethod (element) {
   return method.bind(element);
 }
 
+/**
+ * Find parent component of child element
+ * @param {Element} element - HTML element.
+ * @returns {Element|null}
+ */
 function findParentComponent (element) {
   var parent;
   parent = element.parentNode;
@@ -863,6 +1057,11 @@ function findParentComponent (element) {
   return null;
 }
 
+/**
+ * Converts NamedNodeMap of Attr items to the key-value object map.
+ * @param {NamedNodeMap} attributes - List of Element attributes.
+ * @returns {Object} Map of attribute values by their names.
+ */
 function attributesToObject (attributes) {
   const result = Object.create(null);
   Array.prototype.forEach.call(attributes, current => {
@@ -871,6 +1070,11 @@ function attributesToObject (attributes) {
   return result;
 }
 
+/**
+ * Checks if we can mutate the specified HTML tag.
+ * @param {Element} element The DOM element.
+ * @returns {boolean} true if element should not be mutated.
+ */
 function isTagImmutable (element) {
   // these 3 kinds of tags cannot be removed once loaded,
   // otherwise it will cause style or script reloading
