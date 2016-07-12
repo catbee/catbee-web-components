@@ -4,24 +4,6 @@ var assert = require('assert');
 var moduleHelper = require('../../../lib/helpers/moduleHelper');
 
 lab.experiment('lib/helpers/moduleHelper', function () {
-  lab.experiment('#getNameForErrorTemplate', function () {
-    lab.test('should return name with postfix', function (done) {
-      var templateName = moduleHelper.getNameForErrorTemplate(
-        'some'
-      );
-      assert.strictEqual(
-        templateName,
-        'some' + moduleHelper.COMPONENT_ERROR_TEMPLATE_POSTFIX
-      );
-      done();
-    });
-    lab.test('should return empty string for null value', function (done) {
-      var templateName = moduleHelper.getNameForErrorTemplate(null);
-      assert.strictEqual(templateName, '');
-      done();
-    });
-  });
-
   lab.experiment('#getCamelCaseName', function () {
     lab.test('should convert name to camel case with prefix', function (done) {
       var badName = 'awesome-module_name',

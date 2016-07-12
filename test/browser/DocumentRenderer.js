@@ -1,17 +1,17 @@
-var Lab = require('lab');
-var lab = exports.lab = Lab.script();
-var assert = require('assert');
-var events = require('events');
-var jsdom = require('jsdom');
-var appstate = require('appstate');
-var fs = require('fs');
-var ServiceLocator = require('catberry-locator');
-var DocumentRenderer = require('../../browser/DocumentRenderer');
-var ModuleApiProvider = require('../mocks/ModuleApiProvider');
+const Lab = require('lab');
+const lab = exports.lab = Lab.script();
+const assert = require('assert');
+const events = require('events');
+const jsdom = require('jsdom');
+const appstate = require('appstate');
+const fs = require('fs');
+const ServiceLocator = require('catberry-locator');
+const DocumentRenderer = require('../../browser/DocumentRenderer');
+const ModuleApiProvider = require('../mocks/ModuleApiProvider');
 
 lab.experiment('browser/DocumentRenderer', () => {
   lab.experiment('#initWithState', () => {
-    lab.test('should init and bind all components in right order', { only: true }, (done) => {
+    lab.test('Should init and bind all components in right order', (done) => {
       var html = fs.readFileSync(__dirname + '/../cases/browser/DocumentRenderer/initWithState.html');
       var bindCalls = [];
 
@@ -82,7 +82,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should access to watcher data in bind', (done) => {
+    lab.test('Should access to watcher data in bind', (done) => {
       var locator = createLocator();
       var eventBus = locator.resolve('eventBus');
 
@@ -235,7 +235,7 @@ lab.experiment('browser/DocumentRenderer', () => {
   });
 
   lab.experiment('#renderComponent', () => {
-    lab.test('should render component into HTML element', (done) => {
+    lab.test('Should render component into HTML element', (done) => {
       var locator = createLocator();
       var eventBus = locator.resolve('eventBus');
 
@@ -266,7 +266,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render asynchronous component into HTML element', (done) => {
+    lab.test('Should render asynchronous component into HTML element', (done) => {
       var locator = createLocator();
       var eventBus = locator.resolve('eventBus');
 
@@ -302,7 +302,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render debug output instead the content when error in debug mode', (done) => {
+    lab.test('Should render debug output instead the content when error in debug mode', (done) => {
       var locator = createLocator();
       var eventBus = locator.resolve('eventBus');
 
@@ -339,7 +339,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render debug output instead the content when error in debug mode (async)', (done) => {
+    lab.test('Should render debug output instead the content when error in debug mode (async)', (done) => {
       var locator = createLocator();
       var eventBus = locator.resolve('eventBus');
 
@@ -380,7 +380,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render empty string instead the content when error in release mode', (done) => {
+    lab.test('Should render empty string instead the content when error in release mode', (done) => {
       var locator = createLocator({}, { isRelease: true });
       var eventBus = locator.resolve('eventBus');
 
@@ -415,7 +415,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render empty string instead the content when error in release mode (async)', (done) => {
+    lab.test('Should render empty string instead the content when error in release mode (async)', (done) => {
       var locator = createLocator({}, { isRelease: true });
       var eventBus = locator.resolve('eventBus');
 
@@ -454,7 +454,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if there is no such component', (done) => {
+    lab.test('Should do nothing if there is no such component', (done) => {
       var locator = createLocator({}, { isRelease: true });
       var eventBus = locator.resolve('eventBus');
 
@@ -477,57 +477,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if component is HEAD', (done) => {
-      var head = `<title>First title</title>
-        <base href="someLink1" target="_parent">
-        <noscript>noScript1</noscript>
-        <style type="text/css">
-        some styles1
-        </style>
-        <style type="text/css">
-
-        some styles2
-        </style>
-        <script type="application/javascript">
-        some scripts1
-        </script>
-        <script type="application/javascript">
-        some scripts2
-        </script>
-        <script type="application/javascript" src="someScriptSrc1"></script>
-        <script type="application/javascript" src="someScriptSrc2"></script>
-        <link rel="stylesheet" href="someStyleLink1">
-        <link rel="stylesheet" href="someStyleLink2">
-        <meta name="name1" content="value1">
-        <meta name="name2" content="value2">
-        <meta name="name3" content="value3">
-      `;
-
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
-
-      eventBus.on('error', function (error) {
-        assert.strictEqual(error.message, 'head');
-      });
-
-      jsdom.env({
-        html: ' ',
-        done: function (errors, window) {
-          window.document.head.innerHTML = head;
-          locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-
-          renderer.renderComponent(window.document.head)
-            .then(function () {
-              assert.strictEqual(window.document.head.innerHTML, head);
-              done();
-            })
-            .catch(done);
-        }
-      });
-    });
-
-    lab.test('should render nested components', (done) => {
+    lab.test('Should render nested components', (done) => {
       class Component3 {
         template () {
           return `
@@ -611,7 +561,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should merge HEAD component with new rendered HTML', (done) => {
+    lab.test('Should merge HEAD component with new rendered HTML', (done) => {
       var head = `
         <title>First title</title>
         <base href="someLink1" target="_parent">
@@ -711,7 +661,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should bind all events from bind method', (done) => {
+    lab.test('Should bind all events from bind method', (done) => {
       class Component1 {
         template () {
           return `<div><a class="clickable"></a></div><cat-test2 id="unique2"/>`;
@@ -801,7 +751,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should handle dispatched events', (done) => {
+    lab.test('Should handle dispatched events', (done) => {
       class Component1 {
         template () {
           return `
@@ -870,7 +820,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if event selector does not match', (done) => {
+    lab.test('Should do nothing if event selector does not match', (done) => {
       class Component1 {
         template () {
           return '<div><a class="clickable"></a></div>';
@@ -925,7 +875,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if event handler is not a function', (done) => {
+    lab.test('Should do nothing if event handler is not a function', (done) => {
       class Component1 {
         template () {
           return '<div><a class="clickable"></a></div>'
@@ -977,7 +927,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should unbind all events and call unbind', (done) => {
+    lab.test('Should unbind all events and call unbind', (done) => {
       var bindCounters = {
         first: 0,
         second: 0
@@ -1100,7 +1050,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render inner component with actual attributes', (done) => {
+    lab.test('Should render inner component with actual attributes', (done) => {
       var attributesLabel = null;
 
       class OuterComponent {
@@ -1165,7 +1115,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should use the same component instance if it\'s element recreated after rendering', (done) => {
+    lab.test('Should use the same component instance if it\'s element recreated after rendering', (done) => {
       var instances = {
         first: [],
         second: [],
@@ -1278,7 +1228,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should use new component instance if it\'s element removed after rendering', (done) => {
+    lab.test('Should use new component instance if it\'s element removed after rendering', (done) => {
       var instances = {
         first: [],
         second: [],
@@ -1452,7 +1402,7 @@ lab.experiment('browser/DocumentRenderer', () => {
   });
 
   lab.experiment('#updateState', () => {
-    lab.test('should update all components that depend on changed watchers in descending order', (done) => {
+    lab.test('Should update all components that depend on changed watchers in descending order', (done) => {
       var renders = [];
 
       class Component1 {
@@ -1614,7 +1564,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if nothing changes', (done) => {
+    lab.test('Should do nothing if nothing changes', (done) => {
       var renders = [];
 
       class Component1 {
@@ -1772,7 +1722,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should redirect without running signal, if silent mode', (done) => {
+    lab.test('Should redirect without running signal, if silent update queued', (done) => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
       eventBus.on('error', done);
@@ -1870,7 +1820,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       })
     });
 
-    lab.test('should redirect with signal running by default', (done) => {
+    lab.test('Should run signal, after redirect to new url, if signal defined in url setup', (done) => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
       eventBus.on('error', done);
@@ -1887,7 +1837,11 @@ lab.experiment('browser/DocumentRenderer', () => {
 
       Object.assign(routingContext, { args: {} });
 
-      class Document { }
+      class Document {
+        template () {
+          return '';
+        }
+      }
 
       class Link {
         template () {
@@ -1970,7 +1924,7 @@ lab.experiment('browser/DocumentRenderer', () => {
   });
 
   lab.experiment('#createComponent', () => {
-    lab.test('should properly create and render component', (done) => {
+    lab.test('Should properly create and render component', (done) => {
       class Component {
         template () {
           return '<div>Hello, World!</div>'
@@ -2003,7 +1957,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should properly render nested components', (done) => {
+    lab.test('Should properly render nested components', (done) => {
       class Component1 {
         template () {
           return `
@@ -2090,7 +2044,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should reject promise if tag name is not a string', (done) => {
+    lab.test('Should reject promise if tag name is not a string', (done) => {
       class Component {
         template () {
 
@@ -2123,7 +2077,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should reject promise if attributes set is not an object', (done) => {
+    lab.test('Should reject promise if attributes set is not an object', (done) => {
       class Component {
         template () {
 
@@ -2158,8 +2112,8 @@ lab.experiment('browser/DocumentRenderer', () => {
     });
   });
 
-  lab.experiment('#collectGarbage', () => {
-    lab.test('should unlink component if it is not in DOM', (done) => {
+  lab.experiment('#collectGarbage',  () => {
+    lab.test('Should unlink component if it is not in DOM', (done) => {
       const unbinds = [];
 
       class TestComponent {

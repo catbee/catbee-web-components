@@ -1,3 +1,5 @@
+'use strict';
+
 const morphdom = require('morphdom');
 const errorHelper = require('../lib/helpers/errorHelper');
 const moduleHelper = require('../lib/helpers/moduleHelper');
@@ -40,14 +42,26 @@ class DocumentRenderer {
     this._config = locator.resolve('config');
 
     this._isUpdating = false;
+    this._isSilentUpdateQueued = false;
     this._currentRoutingContext = null;
+
     this._componentInstances = Object.create(null);
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
+    this._componentWatchers = Object.create(null);
     this._currentChangedComponents = Object.create(null);
 
     this._localContextProvider = new LocalContextProvider();
     this._stateManager = new StateManager(locator);
+
+    this._eventBus.on('componentStateChanged', (componentId) => {
+      this._currentChangedComponents[componentId] = true;
+
+      // We must wait next tick, before we run update.
+      // It allows to collect all sync update events
+      Promise.resolve()
+        .then(() => this._updateComponents());
+    });
   }
 
   initWithState (routingContext) {
@@ -60,8 +74,10 @@ class DocumentRenderer {
       return;
     }
 
-    this._currentRoutingContext = routingContext;
-    this._stateManager.setRountingContext(routingContext);
+    const patchedRoutingContext = this._patchRoutingContext(routingContext);
+
+    this._currentRoutingContext = patchedRoutingContext;
+    this._stateManager.setRoutingContext(patchedRoutingContext);
 
     return Promise.resolve()
       .then(() => {
@@ -73,7 +89,7 @@ class DocumentRenderer {
       })
       .then(() => {
         this._stateManager.tree.commit();
-        this._localContextProvider.setContext(document, SPECIAL_IDS.$$document); // Set root context
+        this._localContextProvider.setContextById(document, SPECIAL_IDS.$$document); // Set root context
         const documentElement = this._window.document.documentElement;
         const action = (element) => this._initializeComponent(element);
         return this._traverseComponents([documentElement], action);
@@ -81,18 +97,53 @@ class DocumentRenderer {
       .catch((e) => this._eventBus.emit('error', e));
   }
 
-  updateState () {
+  updateState (routingContext) {
+    const { args } = routingContext;
+    const { signal } = args;
+
+    const patchedRoutingContext = this._patchRoutingContext(routingContext);
+
+    this._currentRoutingContext = patchedRoutingContext;
+    this._stateManager.setRoutingContext(patchedRoutingContext);
+
     return Promise.resolve()
       .then(() => {
+        if (!signal || this._isSilentUpdateQueued) {
+          return;
+        }
 
+        return this._stateManager.signal(signal, args);
+      })
+      .then(() => {
+        this._isSilentUpdateQueued = false;
       })
       .catch((e) => this._eventBus.emit('error', e));
   }
 
-  renderComponent (element, renderingContext) {
+  renderComponent (element, rootDescriptor, renderingContext) {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
+        let localContext;
+
+        if (rootDescriptor) {
+          this._localContextProvider.setContextById(rootDescriptor, id); // Set root context
+          localContext = this._localContextProvider.getCurrentContextComponent();
+        } else {
+          const parentElement = findParentComponent(element);
+
+          if (!parentElement) {
+            return;
+          }
+
+          const parentId = this._getId(parentElement);
+          localContext = this._localContextProvider.getDescriptor(element.tagName, parentId);
+          this._localContextProvider.setContextById(localContext, id, parentId);
+        }
+
+        if (!localContext) {
+          return;
+        }
 
         if (!renderingContext) {
           renderingContext = this._createRenderingContext();
@@ -107,7 +158,7 @@ class DocumentRenderer {
         const ComponentConstructor = localContext.constructor;
 
         if (!instance) {
-          ComponentConstructor.prototype.$context = this._getComponentContext(element);
+          ComponentConstructor.prototype.$context = this._getComponentContext(localContext, element);
           instance = new ComponentConstructor(this._locator);
           instance.$context = ComponentConstructor.prototype.$context;
           this._componentInstances[id] = instance;
@@ -246,7 +297,7 @@ class DocumentRenderer {
     return this._componentInstances[id] || null;
   }
 
-  _getComponentContext (element) {
+  _getComponentContext (localContext, element) {
     const componentContext = Object.create(this._currentRoutingContext);
     const name = moduleHelper.getOriginalComponentName(element.tagName);
     const id = this._getId(element);
@@ -265,8 +316,24 @@ class DocumentRenderer {
     componentContext.element = element;
     componentContext.getComponentById = (id) => this.getComponentById(id);
     componentContext.getComponentByElement = (element) => this.getComponentByElement(element);
-    componentContext.createComponent = (...args) => this.createComponent(...args);
+    componentContext.createComponent = (tagName, descriptor, attributes) =>
+      this.createComponent(tagName, descriptor, attributes);
     componentContext.collectGarbage = () => this.collectGarbage();
+    componentContext.signal = (actions, args) => this._stateManager.signal(actions, args);
+    componentContext.props = localContext.props;
+    componentContext.state = this._stateManager.tree;
+
+    componentContext.getWatcherData = () => {
+      var watcher = this._componentWatchers[id];
+
+      if (!watcher) {
+        return Promise.resolve();
+      }
+
+      return Promise.resolve(
+        watcher.get()
+      );
+    };
 
     return Object.freeze(componentContext);
   }
@@ -329,10 +396,27 @@ class DocumentRenderer {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
-        const localContext = this._localContextProvider.getCurrentContextComponent();
+        const parentComponent = findParentComponent(element);
+        let localContext;
+        let parentId;
+
+        if (parentComponent) {
+          parentId = this._getId(parentComponent);
+        }
+
+        if (parentId) {
+          localContext = this._localContextProvider.getDescriptor(element.tagName, parentId);
+          this._localContextProvider.setContextById(localContext, id, parentId);
+        } else {
+          localContext = this._localContextProvider.getCurrentContextComponent();
+        }
+
+        if (!localContext) {
+          return;
+        }
 
         const ComponentConstructor = localContext.constructor;
-        ComponentConstructor.prototype.$context = this._getComponentContext(element);
+        ComponentConstructor.prototype.$context = this._getComponentContext(localContext, element);
 
         const instance = new ComponentConstructor(this._locator);
         instance.$context = ComponentConstructor.prototype.$context;
@@ -340,7 +424,8 @@ class DocumentRenderer {
         this._componentElements[id] = element;
         this._componentInstances[id] = instance;
 
-        return this._bindComponent(element);
+        return this._bindWatcher(localContext, element)
+          .then(() => this._bindComponent(element));
       });
   }
 
@@ -395,6 +480,27 @@ class DocumentRenderer {
       });
   }
 
+  _bindWatcher (localContext, element) {
+    return Promise.resolve()
+      .then(() => {
+        var id = this._getId(element);
+        var attributes = attributesToObject(element.attributes);
+        var watcherDefinition = localContext.watcher;
+
+        if (!watcherDefinition) {
+          return;
+        }
+
+        if (typeof watcherDefinition === 'function') {
+          watcherDefinition = watcherDefinition.apply(null, [attributes]);
+        }
+
+        var watcher = this._stateManager.getWatcher(watcherDefinition);
+        watcher.on('update', () => this._eventBus.emit('componentStateChanged', id));
+        this._componentWatchers[id] = watcher;
+      });
+  }
+
   _createBindingHandler (componentRoot, selectorHandlers) {
     const selectors = Object.keys(selectorHandlers);
 
@@ -441,7 +547,8 @@ class DocumentRenderer {
     const action = (innerElement) => {
       const id = this._getId(innerElement);
       renderingContext.unboundIds[id] = true;
-      return this._unbindComponent(innerElement);
+      return this._unbindComponent(innerElement)
+        .then(() => this._unbindWatcher(id));
     };
 
     return this._traverseComponents([element], action);
@@ -470,6 +577,18 @@ class DocumentRenderer {
     const unbindMethod = moduleHelper.getMethodToInvoke(instance, 'unbind');
     return moduleHelper.getSafePromise(unbindMethod)
       .catch(reason => this._eventBus.emit('error', reason));
+  }
+
+  _unbindWatcher (id) {
+    var watcher = this._componentWatchers[id];
+
+    if (!watcher) {
+      return;
+    }
+
+    watcher.off('update');
+    watcher.release();
+    delete this._componentWatchers[id];
   }
 
   _collectRenderingGarbage (renderingContext) {
@@ -664,6 +783,22 @@ class DocumentRenderer {
     }
 
     return `<${element.nodeName} ${attributes.sort().join(' ')}>${element.textContent}</${element.nodeName}>`;
+  }
+
+  /**
+   * Monkey patch routing context methods.
+   * @param {Object} routingContext
+   * @private
+   */
+  _patchRoutingContext (routingContext) {
+    const patchedRoutingContext = Object.create(routingContext);
+
+    patchedRoutingContext.redirect = (uriString, options = {}) => {
+      this._isSilentUpdateQueued = options.silent;
+      routingContext.redirect.apply(routingContext, [uriString]);
+    };
+
+    return patchedRoutingContext;
   }
 }
 

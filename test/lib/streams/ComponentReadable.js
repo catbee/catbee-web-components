@@ -4,6 +4,8 @@ var assert = require('assert');
 var testCases = require('../../cases/lib/streams/ComponentReadable.json');
 var ServerResponse = require('../../mocks/ServerResponse');
 var ComponentReadable = require('../../../lib/streams/ComponentReadable');
+var ServiceLocator = require('catberry-locator');
+var { EventEmitter } = require('events');
 
 lab.experiment('lib/streams/ComponentReadable', function () {
   lab.experiment('#renderHtml', function () {
@@ -35,7 +37,15 @@ lab.experiment('lib/streams/ComponentReadable', function () {
 });
 
 function createContext() {
+  var locator = new ServiceLocator();
+  var eventBus = new EventEmitter();
+
+  locator.registerInstance('eventBus', eventBus);
+  locator.registerInstance('config', {});
+
+
   return {
+    locator: locator,
     routingContext: {
       middleware: {
         response: new ServerResponse(),
