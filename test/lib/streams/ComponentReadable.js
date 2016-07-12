@@ -1,18 +1,18 @@
-var Lab = require('lab');
-var lab = exports.lab = Lab.script();
-var assert = require('assert');
-var testCases = require('../../cases/lib/streams/ComponentReadable.json');
-var ServerResponse = require('../../mocks/ServerResponse');
-var ComponentReadable = require('../../../lib/streams/ComponentReadable');
-var ServiceLocator = require('catberry-locator');
-var { EventEmitter } = require('events');
+const Lab = require('lab');
+const lab = exports.lab = Lab.script();
+const assert = require('assert');
+const testCases = require('../../cases/lib/streams/ComponentReadable.json');
+const ServerResponse = require('../../mocks/ServerResponse');
+const ComponentReadable = require('../../../lib/streams/ComponentReadable');
+const ServiceLocator = require('catberry-locator');
+const { EventEmitter } = require('events');
 
 lab.experiment('lib/streams/ComponentReadable', function () {
   lab.experiment('#renderHtml', function () {
     testCases.cases.forEach(function (testCase) {
       lab.test(testCase.name, function (done) {
-        var concat = '';
-        var parser = new ComponentReadable(createContext(), testCase.inputStreamOptions);
+        let concat = '';
+        const parser = new ComponentReadable(createContext(), testCase.inputStreamOptions);
 
         parser._isFlushed = true;
 
@@ -37,8 +37,8 @@ lab.experiment('lib/streams/ComponentReadable', function () {
 });
 
 function createContext() {
-  var locator = new ServiceLocator();
-  var eventBus = new EventEmitter();
+  const locator = new ServiceLocator();
+  const eventBus = new EventEmitter();
 
   locator.registerInstance('eventBus', eventBus);
   locator.registerInstance('config', {});
