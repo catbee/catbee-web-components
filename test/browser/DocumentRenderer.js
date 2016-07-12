@@ -2110,6 +2110,180 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
 
     });
+
+    lab.test('Should properly render slot', (done) => {
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return `
+            <cat-slot>
+              <p>Slot injection</p>
+            </cat-slot>
+          `
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = `
+            <cat-slot>
+              <p>Slot injection</p>
+            </cat-slot>
+          `;
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          renderer.createComponent('cat-root', root)
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should properly render default content if slot not provided', (done) => {
+      class Slot {
+        template () {
+          return '<slot>Default value</slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return '<cat-slot></cat-slot>';
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = '<cat-slot>Default value</cat-slot>';
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          renderer.createComponent('cat-root', root)
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should properly render nested components inside slot', { only: true }, (done) => {
+      class InnerSlot {
+        template () {
+          return 'Inner Slot';
+        }
+      }
+
+      const innerSlot = {
+        constructor: InnerSlot
+      };
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return `
+          <cat-slot>
+            <cat-inner-slot></cat-inner-slot>
+          </cat-slot>
+          `;
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'inner-slot',
+            component: innerSlot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = `
+        <cat-slot>
+          <cat-inner-slot>Inner Slot</cat-inner-slot>
+        </cat-slot>
+      `;
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          renderer.createComponent('cat-root', root)
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
   });
 
   lab.experiment('#collectGarbage',  () => {

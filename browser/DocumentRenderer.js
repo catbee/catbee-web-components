@@ -187,6 +187,7 @@ class DocumentRenderer {
         this._componentElements[id] = element;
 
         return Promise.resolve()
+          .then(() => this._bindWatcher(localContext, element))
           .then(() => {
             // we need to unbind the whole hierarchy only at
             // the beginning, not for any new elements
@@ -215,6 +216,21 @@ class DocumentRenderer {
             if (isHead) {
               this._mergeHead(element, tmpElement);
               return [];
+            }
+
+            const slot = this._findSlot(tmpElement);
+
+            if (slot) {
+              let slotHTML;
+
+              if (element.innerHTML === '') {
+                slotHTML = slot.innerHTML;
+              } else {
+                slotHTML = element.innerHTML;
+              }
+
+              slot.insertAdjacentHTML('beforebegin', slotHTML);
+              slot.parentNode.removeChild(slot);
             }
 
             morphdom(element, tmpElement, {
@@ -280,8 +296,9 @@ class DocumentRenderer {
 
   /**
    * Creates and renders a component element.
-   * @param {string} tagName - Name of the HTML tag.
-   * @param {Object?} attributes - Element attributes.
+   * @param {String} tagName - Name of the HTML tag.
+   * @param {Object} component - Component descriptor.
+   * @param {Object} [attributes={}] - Element attributes.
    * @returns {Promise<Element>} Promise for HTML element with the rendered component.
    */
   createComponent (tagName, component, attributes = {}) {
@@ -290,8 +307,6 @@ class DocumentRenderer {
         new Error('Tag name should be a string and attributes should be an object')
       );
     }
-
-    attributes = attributes || Object.create(null);
 
     return Promise.resolve()
       .then(() => {
@@ -456,6 +471,44 @@ class DocumentRenderer {
     }
 
     return elements;
+  }
+
+  /**
+   * Finds first slot of the specified component root.
+   * @param {Node} root - Component's HTML root to begin search with.
+   * @return {Element|null}
+   * @private
+   */
+  _findSlot (root) {
+    let slot = null;
+    const queue = [root];
+
+    while (queue.length > 0) {
+      const currentChildren = queue.shift().children;
+
+      if (!currentChildren) {
+        continue;
+      }
+
+      if (slot !== null) {
+        break;
+      }
+
+      Array.prototype.forEach.call(currentChildren, (currentChild) => {
+        // we should not go inside component nodes
+        if (moduleHelper.isComponentNode(currentChild)) {
+          return;
+        }
+
+        if (currentChild.tagName === moduleHelper.SLOT_TAG_NAME) {
+          slot = currentChild;
+        }
+
+        queue.push(currentChild);
+      });
+    }
+
+    return slot;
   }
 
   /**
