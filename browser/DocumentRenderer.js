@@ -851,7 +851,7 @@ function createCustomEvent (event, currentTargetGetter) {
   const keys = [];
   const properties = {};
 
-  for (const key in event) {
+  for (let key in event) {
     keys.push(key);
   }
 
