@@ -145,6 +145,7 @@ class DocumentRenderer {
       .then(() => {
         const id = this._getId(element);
         let localContext;
+        let parentId;
 
         if (rootDescriptor) {
           this._localContextProvider.setContextById(rootDescriptor, id); // Set root context
@@ -156,7 +157,12 @@ class DocumentRenderer {
             return;
           }
 
-          const parentId = this._getId(parentElement);
+          if (element.$parentId) {
+            parentId = element.$parentId;
+          } else {
+            parentId = this._getId(parentElement);
+          }
+
           localContext = this._localContextProvider.getDescriptor(element.tagName, parentId);
           this._localContextProvider.setContextById(localContext, id, parentId);
         }
@@ -220,17 +226,22 @@ class DocumentRenderer {
 
             const slot = this._findSlot(tmpElement);
 
-            if (slot) {
-              let slotHTML;
+            if (slot && element.hasChildNodes()) {
+              let fragment = this._window.document.createDocumentFragment();
+              let nodes = toArray(element.childNodes);
 
-              if (element.innerHTML === '') {
-                slotHTML = slot.innerHTML;
-              } else {
-                slotHTML = element.innerHTML;
-              }
+              nodes.forEach((node) => {
+                let isComponent = moduleHelper.isComponentNode(node);
 
-              slot.insertAdjacentHTML('beforebegin', slotHTML);
-              slot.parentNode.removeChild(slot);
+                if (isComponent) {
+                  node.$parentId = parentId;
+                }
+
+                fragment.appendChild(node);
+              });
+
+              slot.innerHTML = '';
+              slot.appendChild(fragment);
             }
 
             morphdom(element, tmpElement, {
@@ -1136,5 +1147,22 @@ function isTagImmutable (element) {
     element.nodeName === TAG_NAMES.LINK &&
     element.getAttribute('rel') === 'stylesheet';
 }
+
+/**
+ * Convert array-like object to real array
+ * @param {Array} list
+ * @param {Number} [start]
+ * @returns {Array}
+ */
+function toArray (list, start) {
+  start = start || 0;
+  var i = list.length - start;
+  var ret = new Array(i);
+  while (i--) {
+    ret[i] = list[i + start]
+  }
+  return ret;
+}
+
 
 module.exports = DocumentRenderer;

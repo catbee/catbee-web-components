@@ -606,9 +606,9 @@ lab.experiment('lib/DocumentRenderer', () => {
         <html>
           <head></head>
         <body>
-          <cat-slot>
+          <cat-slot><slot>
             <p>Slot injection</p>
-          </cat-slot>
+          </slot></cat-slot>
         </body>
         </html>
       `;
@@ -674,7 +674,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         <html>
           <head></head>
         <body>
-          <cat-slot>Default value</cat-slot>
+          <cat-slot><slot>Default value</slot></cat-slot>
         </body>
         </html>
       `;
@@ -756,9 +756,9 @@ lab.experiment('lib/DocumentRenderer', () => {
         <html>
           <head></head>
         <body>
-          <cat-slot>
+          <cat-slot><slot>
             <cat-inner-slot>Inner Slot</cat-inner-slot>
-          </cat-slot>
+          </slot></cat-slot>
         </body>
         </html>
       `;
@@ -856,9 +856,9 @@ lab.experiment('lib/DocumentRenderer', () => {
         <html>
           <head></head>
         <body>
-          <cat-slot>
+          <cat-slot><slot>
             <cat-inner-slot><cat-inner-slot-child>Inner Slot Child</cat-inner-slot-child></cat-inner-slot>
-          </cat-slot>
+          </slot></cat-slot>
         </body>
         </html>
       `;

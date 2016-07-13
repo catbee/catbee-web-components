@@ -2146,9 +2146,9 @@ lab.experiment('browser/DocumentRenderer', () => {
       const eventBus = locator.resolve('eventBus');
 
       const expected = `
-            <cat-slot>
+            <cat-slot><slot>
               <p>Slot injection</p>
-            </cat-slot>
+            </slot></cat-slot>
           `;
       eventBus.on('error', done);
 
@@ -2197,7 +2197,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
 
-      const expected = '<cat-slot>Default value</cat-slot>';
+      const expected = '<cat-slot><slot>Default value</slot></cat-slot>';
       eventBus.on('error', done);
 
       jsdom.env({
@@ -2215,7 +2215,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('Should properly render nested components inside slot', { only: true }, (done) => {
+    lab.test('Should properly render nested components inside slot', (done) => {
       class InnerSlot {
         template () {
           return 'Inner Slot';
@@ -2264,10 +2264,10 @@ lab.experiment('browser/DocumentRenderer', () => {
       const eventBus = locator.resolve('eventBus');
 
       const expected = `
-        <cat-slot>
-          <cat-inner-slot>Inner Slot</cat-inner-slot>
-        </cat-slot>
-      `;
+          <cat-slot><slot>
+            <cat-inner-slot>Inner Slot</cat-inner-slot>
+          </slot></cat-slot>
+          `;
       eventBus.on('error', done);
 
       jsdom.env({
