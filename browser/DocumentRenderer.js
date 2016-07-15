@@ -80,7 +80,7 @@ class DocumentRenderer {
 
     if (!document) {
       this._eventBus.emit('error', ERROR_MISSED_REQUIRED_COMPONENTS);
-      return;
+      return Promise.resolve();
     }
 
     const patchedRoutingContext = this._patchRoutingContext(routingContext);
@@ -98,7 +98,7 @@ class DocumentRenderer {
       })
       .then(() => {
         this._stateManager.tree.commit();
-        this._localContextProvider.setContextById(document, SPECIAL_IDS.$$document); // Set root context
+        this._localContextProvider.setContext(document); // Set root context
         const documentElement = this._window.document.documentElement;
         const action = (element) => this._initializeComponent(element);
         return this._traverseComponents([documentElement], action);
@@ -137,39 +137,19 @@ class DocumentRenderer {
   /**
    * Renders a component into the HTML element.
    * @param {Element} element - HTML element of the component.
-   * @param {Object} rootDescriptor - Root component descriptor
+   * @param {Object} rootContext - Root component context
    * @param {Object?} renderingContext - Rendering context for group rendering.
    */
-  renderComponent (element, rootDescriptor, renderingContext) {
+  renderComponent (element, rootContext, renderingContext) {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
-        let localContext;
-        let parentId;
 
-        if (rootDescriptor) {
-          this._localContextProvider.setContextById(rootDescriptor, id); // Set root context
-          localContext = this._localContextProvider.getCurrentContextComponent();
-        } else {
-          const parentElement = findParentComponent(element);
-
-          if (!parentElement) {
-            return;
-          }
-
-          if (element.$parentId) {
-            parentId = element.$parentId;
-          } else {
-            parentId = this._getId(parentElement);
-          }
-
-          localContext = this._localContextProvider.getDescriptor(element.tagName, parentId);
-          this._localContextProvider.setContextById(localContext, id, parentId);
+        if (rootContext) {
+          this._localContextProvider.setContext(rootContext);
         }
 
-        if (!localContext) {
-          return;
-        }
+        let localContext = this._localContextProvider.getCurrentContext();
 
         if (!renderingContext) {
           renderingContext = this._createRenderingContext();
@@ -224,35 +204,15 @@ class DocumentRenderer {
               return [];
             }
 
-            const slot = this._findSlot(tmpElement);
-
-            if (slot && element.hasChildNodes()) {
-              let fragment = this._window.document.createDocumentFragment();
-              let nodes = toArray(element.childNodes);
-
-              nodes.forEach((node) => {
-                let isComponent = moduleHelper.isComponentNode(node);
-
-                if (isComponent) {
-                  node.$parentId = parentId;
-                }
-
-                fragment.appendChild(node);
-              });
-
-              slot.innerHTML = '';
-              slot.appendChild(fragment);
-            }
-
             morphdom(element, tmpElement, {
               onBeforeMorphElChildren: (foundElement) =>
               foundElement === element || !moduleHelper.isComponentNode(foundElement)
             });
 
-            const promises = this._findNestedComponents(element)
-              .map(child => this.renderComponent(child, null, renderingContext));
+            const nestedComponents = this._findNestedComponents(element);
+            const action = (child) => this.renderComponent(child, false, renderingContext);
 
-            return Promise.all(promises);
+            return this._traverseComponents(nestedComponents, action);
           })
           .then(() => this._bindComponent(element))
           .then(() => {
@@ -440,15 +400,34 @@ class DocumentRenderer {
    */
   _traverseComponents (elements, action) {
     if (elements.length === 0) {
+      this._localContextProvider.dropContext();
       return Promise.resolve();
     }
 
     const root = elements.shift();
 
+    if (root.$parentId) {
+      let localContext = this._localContextProvider.getContextByTagName(root.tagName, root.$parentId);
+      this._localContextProvider.setContext(localContext);
+    }
+
     return Promise.resolve()
       .then(() => action(root))
       .then(() => {
-        elements = elements.concat(this._findNestedComponents(root));
+        let nestedElements = this._findNestedComponents(root).map((element) => {
+          let parentNode = findParentComponent(element);
+          let isSlotNode = moduleHelper.isSlotNode(parentNode);
+
+          if (isSlotNode) {
+            element.$parentId = root.$parentId;
+          } else {
+            element.$parentId = this._localContextProvider.getCurrentId();
+          }
+
+          return element;
+        });
+
+        elements = elements.concat(nestedElements);
         return this._traverseComponents(elements, action);
       });
   }
@@ -485,44 +464,6 @@ class DocumentRenderer {
   }
 
   /**
-   * Finds first slot of the specified component root.
-   * @param {Node} root - Component's HTML root to begin search with.
-   * @return {Element|null}
-   * @private
-   */
-  _findSlot (root) {
-    let slot = null;
-    const queue = [root];
-
-    while (queue.length > 0) {
-      const currentChildren = queue.shift().children;
-
-      if (!currentChildren) {
-        continue;
-      }
-
-      if (slot !== null) {
-        break;
-      }
-
-      Array.prototype.forEach.call(currentChildren, (currentChild) => {
-        // we should not go inside component nodes
-        if (moduleHelper.isComponentNode(currentChild)) {
-          return;
-        }
-
-        if (currentChild.tagName === moduleHelper.SLOT_TAG_NAME) {
-          slot = currentChild;
-        }
-
-        queue.push(currentChild);
-      });
-    }
-
-    return slot;
-  }
-
-  /**
    * Initializes the element as a component.
    * @param {Element} element - The component's element.
    * @returns {Promise} Promise for the done initialization.
@@ -532,20 +473,7 @@ class DocumentRenderer {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
-        const parentComponent = findParentComponent(element);
-        let localContext;
-        let parentId;
-
-        if (parentComponent) {
-          parentId = this._getId(parentComponent);
-        }
-
-        if (parentId) {
-          localContext = this._localContextProvider.getDescriptor(element.tagName, parentId);
-          this._localContextProvider.setContextById(localContext, id, parentId);
-        } else {
-          localContext = this._localContextProvider.getCurrentContextComponent();
-        }
+        const localContext = this._localContextProvider.getCurrentContext();
 
         if (!localContext) {
           return;
@@ -1111,7 +1039,7 @@ function findParentComponent (element) {
   parent = element.parentNode;
 
   while (parent) {
-    if (moduleHelper.isComponentNode(parent)) {
+    if (moduleHelper.isComponentNode(parent) || moduleHelper.isSlotNode(parent)) {
       return parent;
     }
 

@@ -231,11 +231,95 @@ lab.experiment('browser/DocumentRenderer', () => {
             .catch(done);
         }
       })
-    })
+    });
+
+    lab.test('Should correct init slot nested components', (done) => {
+      let bindCalls = [];
+      let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+        </head>
+        <body>
+        <cat-slot>
+          <slot>
+            <cat-nested-slot></cat-nested-slot>
+          </slot>
+        </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class Document {
+        bind () {
+          bindCalls.push('document');
+        }
+      }
+
+      class Slot {
+        bind () {
+          bindCalls.push('slot');
+        }
+      }
+
+      class NestedSlot {
+        bind () {
+          bindCalls.push('nested-slot');
+        }
+      }
+
+      const nestedSlot = {
+        constructor: NestedSlot
+      };
+
+      const slot = {
+        constructor: Slot
+      };
+
+      const document = {
+        constructor: Document,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'nested-slot',
+            component: nestedSlot
+          }
+        ]
+      };
+
+      const locator = createLocator(document);
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = [
+        'document',
+        'slot',
+        'nested-slot'
+      ];
+
+      jsdom.env({
+        html: html,
+        done: (errors, window) => {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+
+          renderer.initWithState({
+              args: {}
+            })
+            .then(() => {
+              assert.deepEqual(bindCalls, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
   });
 
   lab.experiment('#renderComponent', () => {
-    lab.test('Should render component into HTML element', (done) => {
+    lab.test('Should render component into HTML element', { only: true }, (done) => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
 
