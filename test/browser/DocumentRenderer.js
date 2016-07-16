@@ -1,33 +1,33 @@
-var Lab = require('lab');
-var lab = exports.lab = Lab.script();
-var assert = require('assert');
-var events = require('events');
-var jsdom = require('jsdom');
-var appstate = require('appstate');
-var fs = require('fs');
-var ServiceLocator = require('catberry-locator');
-var DocumentRenderer = require('../../browser/DocumentRenderer');
-var ModuleApiProvider = require('../mocks/ModuleApiProvider');
+const Lab = require('lab');
+const lab = exports.lab = Lab.script();
+const assert = require('assert');
+const events = require('events');
+const jsdom = require('jsdom');
+const appstate = require('appstate');
+const fs = require('fs');
+const ServiceLocator = require('catberry-locator');
+const DocumentRenderer = require('../../browser/DocumentRenderer');
+const ModuleApiProvider = require('../mocks/ModuleApiProvider');
 
 lab.experiment('browser/DocumentRenderer', () => {
   lab.experiment('#initWithState', () => {
-    lab.test('should init and bind all components in right order', (done) => {
-      var html = fs.readFileSync(__dirname + '/../cases/browser/DocumentRenderer/initWithState.html');
-      var bindCalls = [];
+    lab.test('Should init and bind all components in right order', (done) => {
+      const html = fs.readFileSync(__dirname + '/../cases/browser/DocumentRenderer/initWithState.html');
+      let bindCalls = [];
 
       class NestedComponent {
         bind () {
-          var id = this.$context.attributes.id ?
+          const id = this.$context.attributes.id ?
           '-' + this.$context.attributes.id : '';
           bindCalls.push(this.$context.name + id);
         }
       }
 
-      var deepNested = {
+      const deepNested = {
         constructor: NestedComponent
       };
 
-      var nested = {
+      const nested = {
         constructor: NestedComponent,
         children: [
           {
@@ -37,7 +37,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var documentComponent = {
+      const documentComponent = {
         constructor: NestedComponent,
         children: [
           {
@@ -51,10 +51,10 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator(documentComponent);
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator(documentComponent);
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = [
+      const expected = [
         'document',
         'head',
         'comp-1',
@@ -68,7 +68,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         html: html,
         done: (errors, window) => {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
           renderer.initWithState({
             args: {}
@@ -82,9 +82,9 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should access to watcher data in bind', (done) => {
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should access to watcher data in bind', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
       class Empty {
         template () {
@@ -103,11 +103,11 @@ lab.experiment('browser/DocumentRenderer', () => {
       class Document {
       }
 
-      var empty = {
+      const empty = {
         constructor: Empty
       };
 
-      var document = {
+      const document = {
         constructor: Document,
         children: [
           {
@@ -120,7 +120,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var html = `
+      const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -138,7 +138,7 @@ lab.experiment('browser/DocumentRenderer', () => {
 
           locator.registerInstance('window', window);
 
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
           locator.registerInstance('documentComponent', document);
 
           renderer.initWithState({
@@ -207,7 +207,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var html = `
+      const html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -231,15 +231,99 @@ lab.experiment('browser/DocumentRenderer', () => {
             .catch(done);
         }
       })
-    })
+    });
+
+    lab.test('Should correct init slot nested components', (done) => {
+      let bindCalls = [];
+      let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+        </head>
+        <body>
+        <cat-slot>
+          <slot>
+            <cat-nested-slot></cat-nested-slot>
+          </slot>
+        </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class Document {
+        bind () {
+          bindCalls.push('document');
+        }
+      }
+
+      class Slot {
+        bind () {
+          bindCalls.push('slot');
+        }
+      }
+
+      class NestedSlot {
+        bind () {
+          bindCalls.push('nested-slot');
+        }
+      }
+
+      const nestedSlot = {
+        constructor: NestedSlot
+      };
+
+      const slot = {
+        constructor: Slot
+      };
+
+      const document = {
+        constructor: Document,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'nested-slot',
+            component: nestedSlot
+          }
+        ]
+      };
+
+      const locator = createLocator(document);
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = [
+        'document',
+        'slot',
+        'nested-slot'
+      ];
+
+      jsdom.env({
+        html: html,
+        done: (errors, window) => {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+
+          renderer.initWithState({
+              args: {}
+            })
+            .then(() => {
+              assert.deepEqual(bindCalls, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
   });
 
   lab.experiment('#renderComponent', () => {
-    lab.test('should render component into HTML element', (done) => {
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should render component into HTML element', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = 'test<br><div>Hello, World!</div>';
+      const expected = 'test<br><div>Hello, World!</div>';
 
       eventBus.on('error', done);
       jsdom.env({
@@ -253,8 +337,8 @@ lab.experiment('browser/DocumentRenderer', () => {
 
           locator.registerInstance('window', window);
 
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
 
           renderer.renderComponent(element, { constructor: Component })
             .then(function () {
@@ -266,11 +350,11 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render asynchronous component into HTML element', (done) => {
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should render asynchronous component into HTML element', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = 'test-async<br><div>Hello, World!</div>';
+      const expected = 'test-async<br><div>Hello, World!</div>';
 
       eventBus.on('error', done);
       jsdom.env({
@@ -289,8 +373,8 @@ lab.experiment('browser/DocumentRenderer', () => {
           }
 
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
 
           renderer.renderComponent(element, { constructor: Component })
             .then(function () {
@@ -302,11 +386,11 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render debug output instead the content when error in debug mode', (done) => {
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should render debug output instead the content when error in debug mode', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var check = /Error: test/;
+      const check = /Error: test/;
 
       eventBus.on('error', function (error) {
         assert.strictEqual(error.message, 'test');
@@ -326,8 +410,8 @@ lab.experiment('browser/DocumentRenderer', () => {
           }
 
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
 
           renderer.renderComponent(element, { constructor: Component })
             .then(function () {
@@ -339,11 +423,11 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render debug output instead the content when error in debug mode (async)', (done) => {
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should render debug output instead the content when error in debug mode (async)', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var check = /Error: test/;
+      const check = /Error: test/;
 
       eventBus.on('error', function (error) {
         assert.strictEqual(error.message, 'test');
@@ -367,8 +451,8 @@ lab.experiment('browser/DocumentRenderer', () => {
           }
 
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
 
           renderer.renderComponent(element, { constructor: Component })
             .then(function () {
@@ -380,9 +464,9 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render empty string instead the content when error in release mode', (done) => {
-      var locator = createLocator({}, { isRelease: true });
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should render empty string instead the content when error in release mode', (done) => {
+      const locator = createLocator({}, { isRelease: true });
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', function (error) {
         assert.strictEqual(error.message, 'test');
@@ -402,8 +486,8 @@ lab.experiment('browser/DocumentRenderer', () => {
           }
 
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
 
           renderer.renderComponent(element, { constructor: Component })
             .then(function () {
@@ -415,9 +499,9 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render empty string instead the content when error in release mode (async)', (done) => {
-      var locator = createLocator({}, { isRelease: true });
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should render empty string instead the content when error in release mode (async)', (done) => {
+      const locator = createLocator({}, { isRelease: true });
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', function (error) {
         assert.strictEqual(error.message, 'test');
@@ -441,8 +525,8 @@ lab.experiment('browser/DocumentRenderer', () => {
           }
 
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
 
           renderer.renderComponent(element, { constructor: Component })
             .then(function () {
@@ -454,17 +538,17 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if there is no such component', (done) => {
-      var locator = createLocator({}, { isRelease: true });
-      var eventBus = locator.resolve('eventBus');
+    lab.test('Should do nothing if there is no such component', (done) => {
+      const locator = createLocator({}, { isRelease: true });
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', done);
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test-async');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test-async');
 
           element.setAttribute('id', 'unique');
           renderer.renderComponent(element)
@@ -477,57 +561,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if component is HEAD', (done) => {
-      var head = `<title>First title</title>
-        <base href="someLink1" target="_parent">
-        <noscript>noScript1</noscript>
-        <style type="text/css">
-        some styles1
-        </style>
-        <style type="text/css">
-
-        some styles2
-        </style>
-        <script type="application/javascript">
-        some scripts1
-        </script>
-        <script type="application/javascript">
-        some scripts2
-        </script>
-        <script type="application/javascript" src="someScriptSrc1"></script>
-        <script type="application/javascript" src="someScriptSrc2"></script>
-        <link rel="stylesheet" href="someStyleLink1">
-        <link rel="stylesheet" href="someStyleLink2">
-        <meta name="name1" content="value1">
-        <meta name="name2" content="value2">
-        <meta name="name3" content="value3">
-      `;
-
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
-
-      eventBus.on('error', function (error) {
-        assert.strictEqual(error.message, 'head');
-      });
-
-      jsdom.env({
-        html: ' ',
-        done: function (errors, window) {
-          window.document.head.innerHTML = head;
-          locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-
-          renderer.renderComponent(window.document.head)
-            .then(function () {
-              assert.strictEqual(window.document.head.innerHTML, head);
-              done();
-            })
-            .catch(done);
-        }
-      });
-    });
-
-    lab.test('should render nested components', (done) => {
+    lab.test('Should render nested components', (done) => {
       class Component3 {
         template () {
           return `
@@ -537,7 +571,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component3 = {
+      const component3 = {
         constructor: Component3
       };
 
@@ -550,7 +584,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component2 = {
+      const component2 = {
         constructor: Component2,
         children: [
           {
@@ -569,7 +603,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -579,10 +613,10 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator({}, {});
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator({}, {});
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = `
+      const expected = `
             <div>Hello from test1</div>
             <cat-test2 id="unique2">
             <div>Hello from test2</div>
@@ -597,8 +631,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
 
           element.setAttribute('id', 'unique1');
           renderer.renderComponent(element, component1)
@@ -611,8 +645,8 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should merge HEAD component with new rendered HTML', (done) => {
-      var head = `
+    lab.test('Should merge HEAD component with new rendered HTML', (done) => {
+      const head = `
         <title>First title</title>
         <base href="someLink1" target="_parent">
         <style type="text/css">
@@ -640,7 +674,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         <meta name="name3" content="value3">
       `;
 
-      var template = `
+      const template = `
         <title>Second title</title>
         <base href="someLink2" target="_parent">
         <style type="text/css">
@@ -684,12 +718,12 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var headComponent = {
+      const headComponent = {
         constructor: Head
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', done);
 
@@ -698,7 +732,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         done: function (errors, window) {
           window.document.head.innerHTML = head;
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
           renderer.renderComponent(window.document.head, headComponent)
             .then(function () {
@@ -711,7 +745,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should bind all events from bind method', (done) => {
+    lab.test('Should bind all events from bind method', (done) => {
       class Component1 {
         template () {
           return `<div><a class="clickable"></a></div><cat-test2 id="unique2"/>`;
@@ -752,11 +786,11 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component2 = {
+      const component2 = {
         constructor: Component2
       };
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -766,26 +800,26 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = `<div><a class="clickable">Component1</a></div><cat-test2 id="unique2"><span><a class="clickable">Component2Component1</a></span></cat-test2>`;
+      const expected = `<div><a class="clickable">Component1</a></div><cat-test2 id="unique2"><span><a class="clickable">Component2Component1</a></span></cat-test2>`;
       eventBus.on('error', done);
 
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
-          var element = window.document.createElement('cat-test1');
+          const element = window.document.createElement('cat-test1');
 
           renderer.renderComponent(element, component1)
             .then(function () {
-              var event;
-              var links = element.querySelectorAll('a.clickable');
+              let event;
+              const links = element.querySelectorAll('a.clickable');
 
-              for (var i = 0; i < links.length; i++) {
+              for (let i = 0; i < links.length; i++) {
                 event = window.document.createEvent('MouseEvents');
                 event.initEvent('click', true, true);
                 links[i].dispatchEvent(event);
@@ -801,7 +835,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should handle dispatched events', (done) => {
+    lab.test('Should handle dispatched events', (done) => {
       class Component1 {
         template () {
           return `
@@ -828,14 +862,14 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component1 = {
+      const component1 = {
         constructor: Component1
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = `
+      const expected = `
             <div><a class="clickable">
             <span><div class="toclick"></div>Component1</span>
             </a>Component1</div>
@@ -846,15 +880,15 @@ lab.experiment('browser/DocumentRenderer', () => {
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
 
           renderer.renderComponent(element, component1)
             .then(function () {
-              var event;
-              var toClick = element.querySelectorAll('div.toclick');
+              let event;
+              const toClick = element.querySelectorAll('div.toclick');
 
-              for (var i = 0; i < toClick.length; i++) {
+              for (let i = 0; i < toClick.length; i++) {
                 event = window.document.createEvent('MouseEvents');
                 event.initEvent('click', true, true);
                 toClick[i].dispatchEvent(event);
@@ -870,7 +904,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if event selector does not match', (done) => {
+    lab.test('Should do nothing if event selector does not match', (done) => {
       class Component1 {
         template () {
           return '<div><a class="clickable"></a></div>';
@@ -887,29 +921,29 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component1 = {
+      const component1 = {
         constructor: Component1
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = '<div><a class="clickable"></a></div>';
+      const expected = '<div><a class="clickable"></a></div>';
       eventBus.on('error', done);
 
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
 
           renderer.renderComponent(element, component1)
             .then(function () {
-              var event;
-              var links = element.querySelectorAll('a.clickable');
+              let event;
+              const links = element.querySelectorAll('a.clickable');
 
-              for (var i = 0; i < links.length; i++) {
+              for (let i = 0; i < links.length; i++) {
                 event = window.document.createEvent('MouseEvents');
                 event.initEvent('click', true, true);
                 links[i].dispatchEvent(event);
@@ -925,7 +959,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if event handler is not a function', (done) => {
+    lab.test('Should do nothing if event handler is not a function', (done) => {
       class Component1 {
         template () {
           return '<div><a class="clickable"></a></div>'
@@ -940,28 +974,28 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component1 = {
+      const component1 = {
         constructor: Component1
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = '<div><a class="clickable"></a></div>';
+      const expected = '<div><a class="clickable"></a></div>';
       eventBus.on('error', done);
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
 
           renderer.renderComponent(element, component1)
             .then(function () {
-              var event;
-              var links = element.querySelectorAll('a.clickable');
+              let event;
+              const links = element.querySelectorAll('a.clickable');
 
-              for (var i = 0; i < links.length; i++) {
+              for (let i = 0; i < links.length; i++) {
                 event = window.document.createEvent('MouseEvents');
                 event.initEvent('click', true, true);
                 links[i].dispatchEvent(event);
@@ -977,12 +1011,12 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should unbind all events and call unbind', (done) => {
-      var bindCounters = {
+    lab.test('Should unbind all events and call unbind', (done) => {
+      let bindCounters = {
         first: 0,
         second: 0
       };
-      var unbindCounters = {
+      let unbindCounters = {
         first: 0,
         second: 0
       };
@@ -1040,11 +1074,11 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component2 = {
+      const component2 = {
         constructor: Component2
       };
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -1054,10 +1088,10 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = '<div><a class="clickable">' +
+      const expected = '<div><a class="clickable">' +
         '</a></div>' +
         '<cat-test2>' +
         '<span><a class="clickable">' +
@@ -1069,25 +1103,25 @@ lab.experiment('browser/DocumentRenderer', () => {
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
 
           renderer.renderComponent(element, component1)
             .then(function () {
               return renderer.renderComponent(element, component1);
             })
             .then(function () {
-              var event;
-              var links = element.querySelectorAll('a.clickable');
+              let event;
+              const links = element.querySelectorAll('a.clickable');
 
-              for (var i = 0; i < links.length; i++) {
+              for (let i = 0; i < links.length; i++) {
                 event = window.document.createEvent('MouseEvents');
                 event.initEvent('click', true, true);
                 links[i].dispatchEvent(event);
               }
 
               setTimeout(function () {
-                //assert.strictEqual(element.innerHTML, expected);
+                assert.strictEqual(element.innerHTML, expected);
                 assert.strictEqual(bindCounters.first, 2);
                 assert.strictEqual(bindCounters.second, 2);
                 assert.strictEqual(unbindCounters.first, 1);
@@ -1100,8 +1134,8 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should render inner component with actual attributes', (done) => {
-      var attributesLabel = null;
+    lab.test('Should render inner component with actual attributes', (done) => {
+      let attributesLabel = null;
 
       class OuterComponent {
         template (ctx) {
@@ -1123,11 +1157,11 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var innerComponent = {
+      const innerComponent = {
         constructor: InnerComponent
       };
 
-      var outerComponent = {
+      const outerComponent = {
         constructor: OuterComponent,
         children: [
           {
@@ -1137,8 +1171,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', done);
 
@@ -1146,8 +1180,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         html: ' ',
         done (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
           element.setAttribute('label', 'first');
 
           renderer.renderComponent(element, outerComponent)
@@ -1165,8 +1199,8 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should use the same component instance if it\'s element recreated after rendering', (done) => {
-      var instances = {
+    lab.test('Should use the same component instance if it\'s element recreated after rendering', (done) => {
+      const instances = {
         first: [],
         second: [],
         third: []
@@ -1224,11 +1258,11 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component3 = {
+      const component3 = {
         constructor: Component3
       };
 
-      var component2 = {
+      const component2 = {
         constructor: Component2,
         children: [
           {
@@ -1238,7 +1272,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -1248,8 +1282,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', done);
 
@@ -1257,8 +1291,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
 
           renderer.renderComponent(element, component1)
             .then(function () {
@@ -1278,14 +1312,14 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should use new component instance if it\'s element removed after rendering', (done) => {
-      var instances = {
+    lab.test('Should use new component instance if it\'s element removed after rendering', (done) => {
+      const instances = {
         first: [],
         second: [],
         third: []
       };
 
-      var counter = 0;
+      let counter = 0;
 
       class Component1 {
         constructor () {
@@ -1339,11 +1373,11 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component3 = {
+      const component3 = {
         constructor: Component3
       };
 
-      var component2 = {
+      const component2 = {
         constructor: Component2,
         children: [
           {
@@ -1353,7 +1387,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -1363,8 +1397,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', done);
 
@@ -1373,8 +1407,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         done: function (errors, window) {
           locator.registerInstance('window', window);
 
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-test1');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test1');
 
           counter++;
 
@@ -1415,7 +1449,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var recursive = {
+      const recursive = {
         constructor: Recursive,
         children: [
           {
@@ -1425,10 +1459,10 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = '<cat-recursive id="2"><cat-recursive id="3"><cat-recursive id="4"><cat-recursive id="5"><cat-recursive id="6"><cat-recursive id="7"><cat-recursive id="8"><cat-recursive id="9"><cat-recursive id="10"></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive>';
+      const expected = '<cat-recursive id="2"><cat-recursive id="3"><cat-recursive id="4"><cat-recursive id="5"><cat-recursive id="6"><cat-recursive id="7"><cat-recursive id="8"><cat-recursive id="9"><cat-recursive id="10"></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive></cat-recursive>';
 
       eventBus.on('error', done);
       jsdom.env({
@@ -1436,8 +1470,8 @@ lab.experiment('browser/DocumentRenderer', () => {
         done: function (errors, window) {
           locator.registerInstance('window', window);
 
-          var renderer = new DocumentRenderer(locator);
-          var element = window.document.createElement('cat-recursive');
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-recursive');
           element.setAttribute('id', '1');
 
           renderer.renderComponent(element, recursive)
@@ -1452,8 +1486,8 @@ lab.experiment('browser/DocumentRenderer', () => {
   });
 
   lab.experiment('#updateState', () => {
-    lab.test('should update all components that depend on changed watchers in descending order', (done) => {
-      var renders = [];
+    lab.test('Should update all components that depend on changed watchers in descending order', (done) => {
+      const renders = [];
 
       class Component1 {
         template () {
@@ -1496,11 +1530,11 @@ lab.experiment('browser/DocumentRenderer', () => {
         };
       }
 
-      var component3 = {
+      const component3 = {
         constructor: Component3
       };
 
-      var component2 = {
+      const component2 = {
         constructor: Component2,
         children: [
           {
@@ -1513,7 +1547,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -1526,7 +1560,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var document = {
+      const document = {
         constructor: class Document {},
         children: [
           {
@@ -1546,7 +1580,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var html = `
+      const html = `
         <cat-test1 id="1">
           test1<br>
           <div>Hello from test1</div>
@@ -1563,15 +1597,15 @@ lab.experiment('browser/DocumentRenderer', () => {
         </cat-test3>
       `;
 
-      var locator = createLocator(document);
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator(document);
+      const eventBus = locator.resolve('eventBus');
       eventBus.on('error', done);
 
       jsdom.env({
         html: html,
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
           renderer.initWithState({
             args: {
@@ -1614,8 +1648,8 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should do nothing if nothing changes', (done) => {
-      var renders = [];
+    lab.test('Should do nothing if nothing changes', (done) => {
+      const renders = [];
 
       class Component1 {
         template () {
@@ -1658,11 +1692,11 @@ lab.experiment('browser/DocumentRenderer', () => {
         };
       }
 
-      var component3 = {
+      const component3 = {
         constructor: Component3
       };
 
-      var component2 = {
+      const component2 = {
         constructor: Component2,
         children: [
           {
@@ -1675,7 +1709,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -1688,7 +1722,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var document = {
+      const document = {
         constructor: class Document {},
         children: [
           {
@@ -1708,7 +1742,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var html = `
+      const html = `
         <cat-test1 id="1">
           test1<br>
           <div>Hello from test1</div>
@@ -1725,15 +1759,15 @@ lab.experiment('browser/DocumentRenderer', () => {
         </cat-test3>
       `;
 
-      var locator = createLocator(document);
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator(document);
+      const eventBus = locator.resolve('eventBus');
       eventBus.on('error', done);
 
       jsdom.env({
         html: html,
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
           renderer.initWithState({
             args: {
@@ -1772,7 +1806,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should redirect without running signal, if silent mode', (done) => {
+    lab.test('Should redirect without running signal, if silent update queued', (done) => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
       eventBus.on('error', done);
@@ -1827,7 +1861,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var html = `
+      const html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -1850,10 +1884,10 @@ lab.experiment('browser/DocumentRenderer', () => {
           renderer
             .initWithState(routingContext)
             .then(() => {
-              var event;
-              var links = window.document.querySelectorAll('a.clickable');
+              let event;
+              const links = window.document.querySelectorAll('a.clickable');
 
-              for (var i = 0; i < links.length; i++) {
+              for (let i = 0; i < links.length; i++) {
                 event = window.document.createEvent('MouseEvents');
                 event.initEvent('click', true, true);
                 links[i].dispatchEvent(event);
@@ -1870,7 +1904,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       })
     });
 
-    lab.test('should redirect with signal running by default', (done) => {
+    lab.test('Should run signal, after redirect to new url, if signal defined in url setup', (done) => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
       eventBus.on('error', done);
@@ -1887,7 +1921,11 @@ lab.experiment('browser/DocumentRenderer', () => {
 
       Object.assign(routingContext, { args: {} });
 
-      class Document { }
+      class Document {
+        template () {
+          return '';
+        }
+      }
 
       class Link {
         template () {
@@ -1925,7 +1963,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var html = `
+      const html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -1948,8 +1986,8 @@ lab.experiment('browser/DocumentRenderer', () => {
           renderer
             .initWithState(routingContext)
             .then(() => {
-              var event;
-              var links = window.document.querySelectorAll('a.clickable');
+              let event;
+              let links = window.document.querySelectorAll('a.clickable');
 
               for (let i = 0; i < links.length; i++) {
                 event = window.document.createEvent('MouseEvents');
@@ -1970,28 +2008,28 @@ lab.experiment('browser/DocumentRenderer', () => {
   });
 
   lab.experiment('#createComponent', () => {
-    lab.test('should properly create and render component', (done) => {
+    lab.test('Should properly create and render component', (done) => {
       class Component {
         template () {
           return '<div>Hello, World!</div>'
         }
       }
 
-      var component = {
+      let component = {
         constructor: Component
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
-      var expected = '<div>Hello, World!</div>';
+      const expected = '<div>Hello, World!</div>';
       eventBus.on('error', done);
 
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
           renderer.createComponent('cat-test', component)
             .then(function (element) {
               assert.strictEqual(element.innerHTML, expected);
@@ -2003,7 +2041,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should properly render nested components', (done) => {
+    lab.test('Should properly render nested components', (done) => {
       class Component1 {
         template () {
           return `
@@ -2032,19 +2070,19 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var component4 = {
+      const component4 = {
         constructor: Component4
       };
 
-      var component3 = {
+      const component3 = {
         constructor: Component3
       };
 
-      var component2 = {
+      const component2 = {
         constructor: Component2
       };
 
-      var component1 = {
+      const component1 = {
         constructor: Component1,
         children: [
           {
@@ -2058,23 +2096,23 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
       eventBus.on('error', done);
 
-      var expected1 = `
+      const expected1 = `
               <div>Hello from test1!</div>
               <cat-test2 id="test2"><div>Hello from test2!</div></cat-test2>
               <cat-test3 id="test3"><div>Hello from test3!</div></cat-test3>
             `;
 
-      var expected2 = '<div>Hello from test4!</div>';
+      const expected2 = '<div>Hello from test4!</div>';
 
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
           renderer.createComponent('cat-test1', component1, { id: 'test1' })
             .then(function (element) {
@@ -2090,26 +2128,26 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should reject promise if tag name is not a string', (done) => {
+    lab.test('Should reject promise if tag name is not a string', (done) => {
       class Component {
         template () {
 
         }
       }
 
-      var component = {
+      const component = {
         constructor: Component
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', done);
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
           renderer.createComponent(500, component)
             .then(function () {
@@ -2123,26 +2161,26 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('should reject promise if attributes set is not an object', (done) => {
+    lab.test('Should reject promise if attributes set is not an object', (done) => {
       class Component {
         template () {
 
         }
       }
 
-      var component = {
+      const component = {
         constructor: Component
       };
 
-      var locator = createLocator();
-      var eventBus = locator.resolve('eventBus');
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
 
       eventBus.on('error', done);
       jsdom.env({
         html: ' ',
         done: function (errors, window) {
           locator.registerInstance('window', window);
-          var renderer = new DocumentRenderer(locator);
+          const renderer = new DocumentRenderer(locator);
 
           renderer.createComponent('cat-test', component, 500)
             .then(function () {
@@ -2156,10 +2194,184 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
 
     });
+
+    lab.test('Should properly render slot', (done) => {
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return `
+            <cat-slot>
+              <p>Slot injection</p>
+            </cat-slot>
+          `
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = `
+            <cat-slot><slot>
+              <p>Slot injection</p>
+            </slot></cat-slot>
+          `;
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          renderer.createComponent('cat-root', root)
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should properly render default content if slot not provided', (done) => {
+      class Slot {
+        template () {
+          return '<slot>Default value</slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return '<cat-slot></cat-slot>';
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = '<cat-slot><slot>Default value</slot></cat-slot>';
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          renderer.createComponent('cat-root', root)
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should properly render nested components inside slot', (done) => {
+      class InnerSlot {
+        template () {
+          return 'Inner Slot';
+        }
+      }
+
+      const innerSlot = {
+        constructor: InnerSlot
+      };
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return `
+          <cat-slot>
+            <cat-inner-slot></cat-inner-slot>
+          </cat-slot>
+          `;
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'inner-slot',
+            component: innerSlot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = `
+          <cat-slot><slot>
+            <cat-inner-slot>Inner Slot</cat-inner-slot>
+          </slot></cat-slot>
+          `;
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          renderer.createComponent('cat-root', root)
+            .then(function (element) {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
   });
 
-  lab.experiment('#collectGarbage', () => {
-    lab.test('should unlink component if it is not in DOM', (done) => {
+  lab.experiment('#collectGarbage',  () => {
+    lab.test('Should unlink component if it is not in DOM', (done) => {
       const unbinds = [];
 
       class TestComponent {
@@ -2168,7 +2380,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
-      var test3 = {
+      const test3 = {
         constructor: class TestComponent3 extends TestComponent {
           template () {
             return ''
@@ -2176,7 +2388,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       };
 
-      var test2 = {
+      const test2 = {
         constructor: class TestComponent2 extends TestComponent {
           template () {
             return ''
@@ -2184,7 +2396,7 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       };
 
-      var test1 = {
+      const test1 = {
         constructor: class TestComponent1 extends TestComponent {
           template () {
             return `
@@ -2254,8 +2466,8 @@ lab.experiment('browser/DocumentRenderer', () => {
 });
 
 function createLocator (documentComponent = {}, config = {}) {
-  var locator = new ServiceLocator();
-  var eventBus = new events.EventEmitter();
+  const locator = new ServiceLocator();
+  const eventBus = new events.EventEmitter();
 
   locator.registerInstance('serviceLocator', locator);
   locator.registerInstance('config', config);
