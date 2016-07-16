@@ -169,7 +169,6 @@ class DocumentRenderer {
       this._componentContexts[id] = localContext;
 
       return Promise.resolve()
-        .then(() => this._bindWatcher(localContext, actionElement))
         .then(() => {
           // we need to unbind the whole hierarchy only at
           // the beginning, not for any new elements
@@ -180,6 +179,7 @@ class DocumentRenderer {
           return this._unbindAll(actionElement, renderingContext);
         })
         .catch((reason) => this._eventBus.emit('error', reason))
+        .then(() => this._bindWatcher(localContext, actionElement))
         .then(() => {
           const renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
           return moduleHelper.getSafePromise(renderMethod);
@@ -356,10 +356,11 @@ class DocumentRenderer {
     componentContext.state = this._stateManager.tree;
 
     componentContext.getWatcherData = () => {
-      var watcher = this._componentWatchers[id];
+      let watcher = this._componentWatchers[id];
 
       if (!watcher) {
-        return Promise.resolve();
+        let stub = Object.create(null);
+        return Promise.resolve(stub);
       }
 
       return Promise.resolve(
