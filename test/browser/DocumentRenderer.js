@@ -319,7 +319,7 @@ lab.experiment('browser/DocumentRenderer', () => {
   });
 
   lab.experiment('#renderComponent', () => {
-    lab.test('Should render component into HTML element', { only: true }, (done) => {
+    lab.test('Should render component into HTML element', (done) => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
 
@@ -1121,7 +1121,7 @@ lab.experiment('browser/DocumentRenderer', () => {
               }
 
               setTimeout(function () {
-                //assert.strictEqual(element.innerHTML, expected);
+                assert.strictEqual(element.innerHTML, expected);
                 assert.strictEqual(bindCounters.first, 2);
                 assert.strictEqual(bindCounters.second, 2);
                 assert.strictEqual(unbindCounters.first, 1);
