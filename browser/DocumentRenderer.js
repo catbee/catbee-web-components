@@ -196,20 +196,33 @@ class DocumentRenderer {
           const tmpElement = actionElement.cloneNode(false);
           tmpElement.innerHTML = html;
 
+          // Set temporally container for slot innerHTML
+          actionElement.$slotContents = Object.create(null);
+
+          // Save slot contents in action element
+          findNestedComponents(tmpElement)
+            .filter((nestedElement) => nestedElement.innerHTML.length > 0)
+            .forEach((nestedElement) => {
+              actionElement.$slotContents[nestedElement.tagName] = nestedElement.innerHTML
+            });
+
           if (isHead) {
             this._mergeHead(actionElement, tmpElement);
             return null;
           }
 
-          const slot = findSlot(tmpElement);
+          // We should override slot content only if it presented in parent component
+          let parentComponent = findParentComponent(actionElement);
+          if (parentComponent && parentComponent.$slotContents) {
+            let slotContent = parentComponent.$slotContents[actionElement.tagName];
 
-          if (slot && hadChildrenNodes) {
-            let fragment = this._window.document.createDocumentFragment();
-            let nodes = toArray(actionElement.childNodes);
-            nodes.forEach((node) => fragment.appendChild(node));
+            if (slotContent) {
+              let slot = findSlot(tmpElement);
 
-            slot.innerHTML = '';
-            slot.appendChild(fragment);
+              if (slot) {
+                slot.innerHTML = slotContent;
+              }
+            }
           }
 
           morphdom(actionElement, tmpElement, {
