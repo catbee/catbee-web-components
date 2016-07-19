@@ -10,7 +10,7 @@ const DocumentRenderer = require('../../browser/DocumentRenderer');
 const ModuleApiProvider = require('../mocks/ModuleApiProvider');
 
 lab.experiment('browser/DocumentRenderer', () => {
-  lab.experiment('#initWithState', () => {
+  lab.experiment('#initWithState', { only: true }, () => {
     lab.test('Should init and bind all components in right order', (done) => {
       const html = fs.readFileSync(__dirname + '/../cases/browser/DocumentRenderer/initWithState.html');
       let bindCalls = [];
@@ -1483,6 +1483,330 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       });
     });
+
+    lab.test('Should properly render slot', (done) => {
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return `
+            <cat-slot>
+              <p>Slot injection</p>
+            </cat-slot>
+          `
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = `
+            <cat-slot><slot>
+              <p>Slot injection</p>
+            </slot></cat-slot>
+          `;
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-root');
+          renderer.renderComponent(element, root)
+            .then(function () {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should properly render default content if slot not provided', (done) => {
+      class Slot {
+        template () {
+          return '<slot>Default value</slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return '<cat-slot></cat-slot>';
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = '<cat-slot><slot>Default value</slot></cat-slot>';
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-root');
+          renderer.renderComponent(element, root)
+            .then(function () {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should properly render nested components inside slot', (done) => {
+      class InnerSlot {
+        template () {
+          return 'Inner Slot';
+        }
+      }
+
+      const innerSlot = {
+        constructor: InnerSlot
+      };
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      const slot = {
+        constructor: Slot
+      };
+
+      class Root {
+        template () {
+          return `
+          <cat-slot>
+            <cat-inner-slot></cat-inner-slot>
+          </cat-slot>
+          `;
+        }
+      }
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'inner-slot',
+            component: innerSlot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = `
+          <cat-slot><slot>
+            <cat-inner-slot>Inner Slot</cat-inner-slot>
+          </slot></cat-slot>
+          `;
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-root');
+          renderer.renderComponent(element, root)
+            .then(function () {
+              assert.strictEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should properly render slot content twice', (done) => {
+      let bindQueue = [];
+      let renderQueue = [];
+
+      class NestedSlot {
+        template () {
+          return 'Slot content';
+        }
+
+        bind () {
+          bindQueue.push('nested-slot');
+        }
+
+        render () {
+          renderQueue.push('nested-slot');
+        }
+      }
+
+      class Nested {
+        template () {
+          return '<slot></slot>';
+        }
+
+        bind () {
+          bindQueue.push('nested');
+        }
+
+        render () {
+          renderQueue.push('nested');
+        }
+      }
+
+      class Root {
+        template () {
+          return '<cat-nested><cat-nested-slot></cat-nested-slot></cat-nested>'
+        }
+
+
+        bind () {
+          bindQueue.push('root');
+        }
+
+        render () {
+          renderQueue.push('root');
+        }
+      }
+
+      const nested = {
+        constructor: Nested
+      };
+
+      const nestedSlot = {
+        constructor: NestedSlot
+      };
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'nested',
+            component: nested
+          },
+          {
+            name: 'nested-slot',
+            component: nestedSlot
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
+
+          renderer.renderComponent(element, root)
+            .then(function () {
+              const nestedElement = element.querySelector('cat-nested');
+              return renderer.renderComponent(nestedElement, nested);
+            })
+            .then(function () {
+              assert.deepEqual(renderQueue, ['root', 'nested', 'nested-slot', 'nested', 'nested-slot']);
+              assert.deepEqual(bindQueue, ['root', 'nested', 'nested-slot', 'nested', 'nested-slot']);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should render unique content for two slots', (done) => {
+      class Nested {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      class Root {
+        template () {
+          return '<cat-nested>Content 1</cat-nested><cat-nested>Content 2</cat-nested>'
+        }
+      }
+
+      const nested = {
+        constructor: Nested
+      };
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'nested',
+            component: nested
+          }
+        ]
+      };
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = '<cat-nested><slot>Content 1</slot></cat-nested><cat-nested><slot>Content 2</slot></cat-nested>';
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
+
+          renderer.renderComponent(element, root)
+            .then(function () {
+              assert.deepEqual(element.innerHTML, expected);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    })
   });
 
   lab.experiment('#updateState', () => {
@@ -2193,180 +2517,6 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       });
 
-    });
-
-    lab.test('Should properly render slot', (done) => {
-      class Slot {
-        template () {
-          return '<slot></slot>';
-        }
-      }
-
-      const slot = {
-        constructor: Slot
-      };
-
-      class Root {
-        template () {
-          return `
-            <cat-slot>
-              <p>Slot injection</p>
-            </cat-slot>
-          `
-        }
-      }
-
-      const root = {
-        constructor: Root,
-        children: [
-          {
-            name: 'slot',
-            component: slot
-          }
-        ]
-      };
-
-      const locator = createLocator();
-      const eventBus = locator.resolve('eventBus');
-
-      const expected = `
-            <cat-slot><slot>
-              <p>Slot injection</p>
-            </slot></cat-slot>
-          `;
-      eventBus.on('error', done);
-
-      jsdom.env({
-        html: ' ',
-        done: function (errors, window) {
-          locator.registerInstance('window', window);
-          const renderer = new DocumentRenderer(locator);
-          renderer.createComponent('cat-root', root)
-            .then(function (element) {
-              assert.strictEqual(element.innerHTML, expected);
-              done();
-            })
-            .catch(done);
-        }
-      });
-    });
-
-    lab.test('Should properly render default content if slot not provided', (done) => {
-      class Slot {
-        template () {
-          return '<slot>Default value</slot>';
-        }
-      }
-
-      const slot = {
-        constructor: Slot
-      };
-
-      class Root {
-        template () {
-          return '<cat-slot></cat-slot>';
-        }
-      }
-
-      const root = {
-        constructor: Root,
-        children: [
-          {
-            name: 'slot',
-            component: slot
-          }
-        ]
-      };
-
-      const locator = createLocator();
-      const eventBus = locator.resolve('eventBus');
-
-      const expected = '<cat-slot><slot>Default value</slot></cat-slot>';
-      eventBus.on('error', done);
-
-      jsdom.env({
-        html: ' ',
-        done: function (errors, window) {
-          locator.registerInstance('window', window);
-          const renderer = new DocumentRenderer(locator);
-          renderer.createComponent('cat-root', root)
-            .then(function (element) {
-              assert.strictEqual(element.innerHTML, expected);
-              done();
-            })
-            .catch(done);
-        }
-      });
-    });
-
-    lab.test('Should properly render nested components inside slot', (done) => {
-      class InnerSlot {
-        template () {
-          return 'Inner Slot';
-        }
-      }
-
-      const innerSlot = {
-        constructor: InnerSlot
-      };
-
-      class Slot {
-        template () {
-          return '<slot></slot>';
-        }
-      }
-
-      const slot = {
-        constructor: Slot
-      };
-
-      class Root {
-        template () {
-          return `
-          <cat-slot>
-            <cat-inner-slot></cat-inner-slot>
-          </cat-slot>
-          `;
-        }
-      }
-
-      const root = {
-        constructor: Root,
-        children: [
-          {
-            name: 'slot',
-            component: slot
-          },
-          {
-            name: 'inner-slot',
-            component: innerSlot
-          }
-        ]
-      };
-
-      const locator = createLocator();
-      const eventBus = locator.resolve('eventBus');
-
-      const expected = `
-          <cat-slot><slot>
-            <cat-inner-slot>Inner Slot</cat-inner-slot>
-          </slot></cat-slot>
-          `;
-      eventBus.on('error', done);
-
-      jsdom.env({
-        html: ' ',
-        done: function (errors, window) {
-          locator.registerInstance('window', window);
-          const renderer = new DocumentRenderer(locator);
-          renderer.createComponent('cat-root', root)
-            .then(function (element) {
-              assert.strictEqual(element.innerHTML, expected);
-              done();
-            })
-            .catch(done);
-        }
-      });
     });
   });
 

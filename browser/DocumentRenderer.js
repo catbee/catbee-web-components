@@ -53,10 +53,10 @@ class DocumentRenderer {
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
     this._componentWatchers = Object.create(null);
-    this._componentContexts = Object.create(null);
     this._currentChangedComponents = Object.create(null);
 
     this._stateManager = new StateManager(locator);
+    this._localContextProvider = new LocalContextProvider(locator);
 
     this._eventBus.on('componentStateChanged', (componentId) => {
       this._currentChangedComponents[componentId] = true;
@@ -99,7 +99,7 @@ class DocumentRenderer {
       .then(() => {
         this._stateManager.tree.commit();
         const documentElement = this._window.document.documentElement;
-        const action = (element, localContext) => this._initializeComponent(element, localContext);
+        const action = (element, localContext) => this._initializeComponent(element);
         return this._traverseComponentsWithContext([documentElement], action, document);
       })
       .catch((e) => this._eventBus.emit('error', e));
@@ -135,14 +135,14 @@ class DocumentRenderer {
 
   /**
    * Renders a component into the HTML element.
-   * @param {Element} element - HTML element of the component.
+   * @param {Element} rootElement - HTML element of the component.
    * @param {Object} rootContext - Root component context
    * @param {Object} [renderingContext] - Component rendering context
    */
-  renderComponent (element, rootContext, renderingContext) {
-    const action = (actionElement, localContext) => {
-      const id = this._getId(actionElement);
-      const hadChildrenNodes = (actionElement.children.length > 0);
+  renderComponent (rootElement, rootContext, renderingContext) {
+    const action = (element) => {
+      const id = this._getId(element);
+      const hadChildrenNodes = (element.children.length > 0);
 
       if (!renderingContext) {
         renderingContext = this._createRenderingContext();
@@ -159,14 +159,13 @@ class DocumentRenderer {
       const ComponentConstructor = localContext.constructor;
 
       if (!instance) {
-        ComponentConstructor.prototype.$context = this._getComponentContext(localContext, actionElement);
+        ComponentConstructor.prototype.$context = this._getComponentContext(localContext, element);
         instance = new ComponentConstructor(this._locator);
         instance.$context = ComponentConstructor.prototype.$context;
         this._componentInstances[id] = instance;
       }
 
-      this._componentElements[id] = actionElement;
-      this._componentContexts[id] = localContext;
+      this._componentElements[id] = element;
 
       return Promise.resolve()
         .then(() => {
@@ -176,65 +175,41 @@ class DocumentRenderer {
             return null;
           }
 
-          return this._unbindAll(actionElement, renderingContext);
+          return this._unbindAll(element, renderingContext);
         })
         .catch((reason) => this._eventBus.emit('error', reason))
-        .then(() => this._bindWatcher(localContext, actionElement))
+        .then(() => this._bindWatcher(localContext, element))
         .then(() => {
           const renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
           return moduleHelper.getSafePromise(renderMethod);
         })
         .then((dataContext) => instance.template(dataContext))
-        .catch((reason) => this._handleRenderError(actionElement, reason))
+        .catch((reason) => this._handleRenderError(element, reason))
         .then(html => {
-          const isHead = actionElement.tagName === TAG_NAMES.HEAD;
+          const isHead = element.tagName === TAG_NAMES.HEAD;
 
           if (html === '' && isHead) {
             return null;
           }
 
-          const tmpElement = actionElement.cloneNode(false);
+          const tmpElement = element.cloneNode(false);
           tmpElement.innerHTML = html;
 
-          // Set temporally container for slot innerHTML
-          actionElement.$slotContents = Object.create(null);
-
-          // Save slot contents in action element
-          findNestedComponents(tmpElement)
-            .filter((nestedElement) => nestedElement.innerHTML.length > 0)
-            .forEach((nestedElement) => {
-              actionElement.$slotContents[nestedElement.tagName] = nestedElement.innerHTML
-            });
-
           if (isHead) {
-            this._mergeHead(actionElement, tmpElement);
+            this._mergeHead(element, tmpElement);
             return null;
           }
 
-          // We should override slot content only if it presented in parent component
-          let parentComponent = findParentComponent(actionElement);
-          if (parentComponent && parentComponent.$slotContents) {
-            let slotContent = parentComponent.$slotContents[actionElement.tagName];
-
-            if (slotContent) {
-              let slot = findSlot(tmpElement);
-
-              if (slot) {
-                slot.innerHTML = slotContent;
-              }
-            }
-          }
-
-          morphdom(actionElement, tmpElement, {
+          morphdom(element, tmpElement, {
             onBeforeMorphElChildren: (foundElement) =>
-            foundElement === actionElement || !moduleHelper.isComponentNode(foundElement)
+            foundElement === element || !moduleHelper.isComponentNode(foundElement)
           });
         })
-        .then(() => this._bindComponent(actionElement))
+        .then(() => this._bindComponent(element))
         .catch(reason => this._eventBus.emit('error', reason));
     };
 
-    return this._traverseComponentsWithContext([element], action, rootContext)
+    return this._traverseComponentsWithContext([rootElement], action, rootContext)
       .then(() => this._collectRenderingGarbage(renderingContext));
   }
 
@@ -430,59 +405,38 @@ class DocumentRenderer {
    * Extended traverseComponent method, that support context registration during iterations
    * @param {Array} elements - Elements to start the search.
    * @param {Function} action - Action for every component.
-   * @param {Object|null} rootContext - Root context for start iterations.
-   * @param {LocalContextProvider} [contextProvider] - Current context provider.
+   * @param {Object} [rootContext] - Root context for start iterations.
    * @returns {Promise} Promise for the finished traversal.
    * @private
    */
-  _traverseComponentsWithContext (elements, action, rootContext, contextProvider) {
+  _traverseComponentsWithContext (elements, action, rootContext) {
     if (elements.length === 0) {
       return Promise.resolve();
     }
 
-    if (!contextProvider) {
-      contextProvider = new LocalContextProvider();
-      contextProvider.setContext(rootContext);
-    }
-
     const root = elements.shift();
+    const id = this._getId(root);
 
-    if (root.$parentId && !rootContext) {
-      let localContext = contextProvider.getContextByTagName(root.tagName, root.$parentId);
-      contextProvider.setContext(localContext);
+    if (rootContext) {
+
     }
-
-    const currentContext = contextProvider.getCurrentContext();
 
     return Promise.resolve()
-      .then(() => action(root, currentContext))
+      .then(() => action(root))
       .then(() => {
-        let nestedElements = findNestedComponents(root).map((element) => {
-          let parentNode = findParentComponent(element);
-          let isSlotNode = moduleHelper.isSlotNode(parentNode);
 
-          if (isSlotNode) {
-            element.$parentId = root.$parentId;
-          } else {
-            element.$parentId = contextProvider.getCurrentId();
-          }
-
-          return element;
-        });
-
-        elements = elements.concat(nestedElements);
-        return this._traverseComponentsWithContext(elements, action, null, contextProvider);
+        elements = elements.concat();
+        return this._traverseComponentsWithContext(elements, action);
       });
   }
 
   /**
    * Initializes the element as a component.
    * @param {Element} element - The component's element.
-   * @param {Object} localContext - The component's local context.
    * @returns {Promise} Promise for the done initialization.
    * @private
    */
-  _initializeComponent (element, localContext) {
+  _initializeComponent (element) {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
@@ -499,7 +453,6 @@ class DocumentRenderer {
 
         this._componentElements[id] = element;
         this._componentInstances[id] = instance;
-        this._componentContexts[id] = localContext;
 
         return this._bindWatcher(localContext, element)
           .then(() => this._bindComponent(element));
@@ -741,7 +694,6 @@ class DocumentRenderer {
     delete this._componentElements[id];
     delete this._componentInstances[id];
     delete this._componentBindings[id];
-    delete this._componentContexts[id];
   }
 
   /**
@@ -832,10 +784,9 @@ class DocumentRenderer {
 
     var promises = renderingContext.roots.map(root => {
       const id = this._getId(root);
-      const rootContext = this._componentContexts[id];
       renderingContext.rootIds[id] = true;
 
-      return this.renderComponent(root, rootContext, renderingContext);
+      return this.renderComponent(root, null, renderingContext);
     });
 
     return Promise.all(promises)
@@ -1121,59 +1072,6 @@ function findNestedComponents (root) {
   }
 
   return elements;
-}
-
-/**
- * Finds first slot of the specified component root.
- * @param {Node} root - Component's HTML root to begin search with.
- * @return {Element|null}
- * @private
- */
-function findSlot (root) {
-  let slot = null;
-  const queue = [root];
-
-  while (queue.length > 0) {
-    const currentChildren = queue.shift().children;
-
-    if (!currentChildren) {
-      continue;
-    }
-
-    if (slot !== null) {
-      break;
-    }
-
-    Array.prototype.forEach.call(currentChildren, (currentChild) => {
-      // we should not go inside component nodes
-      if (moduleHelper.isComponentNode(currentChild)) {
-        return;
-      }
-
-      if (currentChild.tagName === moduleHelper.SLOT_TAG_NAME) {
-        slot = currentChild;
-      }
-
-      queue.push(currentChild);
-    });
-  }
-
-  return slot;
-}
-
-/**
- * Convert array-like object to real array
- * @param {Array} list
- * @param {Number} [start]
- * @returns {Array}
- */
-function toArray (list, start = 0) {
-  var i = list.length - start;
-  var ret = new Array(i);
-  while (i--) {
-    ret[i] = list[i + start]
-  }
-  return ret;
 }
 
 
