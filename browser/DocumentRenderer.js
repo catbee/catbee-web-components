@@ -53,6 +53,7 @@ class DocumentRenderer {
     this._componentElements = Object.create(null);
     this._componentBindings = Object.create(null);
     this._componentWatchers = Object.create(null);
+    this._componentSlotContents = Object.create(null);
     this._currentChangedComponents = Object.create(null);
 
     this._stateManager = new StateManager(locator);
@@ -99,7 +100,7 @@ class DocumentRenderer {
       .then(() => {
         this._stateManager.tree.commit();
         const documentElement = this._window.document.documentElement;
-        const action = (element, localContext) => this._initializeComponent(element);
+        const action = (element) => this._initializeComponent(element);
         return this._traverseComponentsWithContext([documentElement], action, document);
       })
       .catch((e) => this._eventBus.emit('error', e));
@@ -396,7 +397,8 @@ class DocumentRenderer {
     return Promise.resolve()
       .then(() => action(root))
       .then(() => {
-        elements = elements.concat(findNestedComponents(root));
+        let nestedElements = this._findNestedComponents(root);
+        elements = elements.concat(nestedElements);
         return this._traverseComponents(elements, action);
       });
   }
@@ -417,15 +419,17 @@ class DocumentRenderer {
     const root = elements.shift();
     const id = this._getId(root);
 
-    if (rootContext) {
-
+    if (!rootContext && root.$parentId) {
+      rootContext = this._localContextProvider.getContextByTagName(root.tagName, root.$parentId);
     }
+
+    this._localContextProvider.setContextById(id, rootContext, root.$parentId);
 
     return Promise.resolve()
       .then(() => action(root))
       .then(() => {
-
-        elements = elements.concat();
+        let nestedComponents = this._findNestedComponents(root);
+        elements = elements.concat(nestedComponents);
         return this._traverseComponentsWithContext(elements, action);
       });
   }
@@ -440,6 +444,7 @@ class DocumentRenderer {
     return Promise.resolve()
       .then(() => {
         const id = this._getId(element);
+        const localContext = this._localContextProvider.getContextById(id);
 
         if (!localContext) {
           return;
@@ -453,6 +458,18 @@ class DocumentRenderer {
 
         this._componentElements[id] = element;
         this._componentInstances[id] = instance;
+
+        const slot = findSlot(element);
+
+        if (slot && slot.children.length > 0) {
+          const children = Array.from(slot.children);
+
+          this._componentSlotContents[id] = children.reduce((fragment, child) => {
+            child.$parentId = this._localContextProvider.getParentById(id);
+            fragment.appendChild(child.cloneNode(false));
+            return fragment;
+          }, this._window.document.createDocumentFragment());
+        } // Rehydrate slot contents from server rendered nodes
 
         return this._bindWatcher(localContext, element)
           .then(() => this._bindComponent(element));
@@ -937,6 +954,39 @@ class DocumentRenderer {
 
     return patchedRoutingContext;
   }
+
+  /**
+   * Finds all descendant components of the specified component root.
+   * @param {Element} root - Root component's HTML root to begin search with.
+   * @private
+   */
+  _findNestedComponents (root) {
+    const elements = [];
+    const rootId = this._getId(root);
+    const queue = [root];
+
+    // does breadth-first search inside the root element
+    while (queue.length > 0) {
+      const currentChildren = queue.shift().children;
+
+      if (!currentChildren) {
+        continue;
+      }
+
+      Array.prototype.forEach.call(currentChildren, (currentChild) => {
+        // and they should be components
+        if (!moduleHelper.isComponentNode(currentChild)) {
+          queue.push(currentChild);
+          return;
+        }
+
+        currentChild.$parentId = rootId;
+        elements.push(currentChild);
+      });
+    }
+
+    return elements;
+  }
 }
 
 /**
@@ -997,26 +1047,6 @@ function getMatchesMethod (element) {
 }
 
 /**
- * Find parent component of child element
- * @param {Element} element - HTML element.
- * @returns {Element|null}
- */
-function findParentComponent (element) {
-  var parent;
-  parent = element.parentNode;
-
-  while (parent) {
-    if (moduleHelper.isComponentNode(parent) || moduleHelper.isSlotNode(parent)) {
-      return parent;
-    }
-
-    parent = parent.parentNode;
-  }
-
-  return null;
-}
-
-/**
  * Converts NamedNodeMap of Attr items to the key-value object map.
  * @param {NamedNodeMap} attributes - List of Element attributes.
  * @returns {Object} Map of attribute values by their names.
@@ -1044,15 +1074,15 @@ function isTagImmutable (element) {
 }
 
 /**
- * Finds all descendant components of the specified component root.
- * @param {Element} root - Root component's HTML root to begin search with.
+ * Finds first slot of the specified component root.
+ * @param {Node} root - Component's HTML root to begin search with.
+ * @return {Element|null}
  * @private
  */
-function findNestedComponents (root) {
-  const elements = [];
+function findSlot (root) {
+  let slot = null;
   const queue = [root];
 
-  // does breadth-first search inside the root element
   while (queue.length > 0) {
     const currentChildren = queue.shift().children;
 
@@ -1060,19 +1090,25 @@ function findNestedComponents (root) {
       continue;
     }
 
+    if (slot !== null) {
+      break;
+    }
+
     Array.prototype.forEach.call(currentChildren, (currentChild) => {
-      // and they should be components
-      if (!moduleHelper.isComponentNode(currentChild)) {
-        queue.push(currentChild);
+      // we should not go inside component nodes
+      if (moduleHelper.isComponentNode(currentChild)) {
         return;
       }
 
-      elements.push(currentChild);
+      if (moduleHelper.isSlotNode(currentChild)) {
+        slot = currentChild;
+      }
+
+      queue.push(currentChild);
     });
   }
 
-  return elements;
+  return slot;
 }
-
 
 module.exports = DocumentRenderer;

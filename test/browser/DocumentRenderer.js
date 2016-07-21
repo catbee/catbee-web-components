@@ -10,7 +10,7 @@ const DocumentRenderer = require('../../browser/DocumentRenderer');
 const ModuleApiProvider = require('../mocks/ModuleApiProvider');
 
 lab.experiment('browser/DocumentRenderer', () => {
-  lab.experiment('#initWithState', { only: true }, () => {
+  lab.experiment('#initWithState', () => {
     lab.test('Should init and bind all components in right order', (done) => {
       const html = fs.readFileSync(__dirname + '/../cases/browser/DocumentRenderer/initWithState.html');
       let bindCalls = [];
@@ -233,7 +233,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       })
     });
 
-    lab.test('Should correct init slot nested components', (done) => {
+    lab.test('Should correct init slot nested components', { only: true }, (done) => {
       let bindCalls = [];
       let html = `
         <!DOCTYPE html>
@@ -243,7 +243,9 @@ lab.experiment('browser/DocumentRenderer', () => {
         <body>
         <cat-slot>
           <slot>
-            <cat-nested-slot></cat-nested-slot>
+            <cat-nested-slot>
+              <cat-nested-child></cat-nested-child>
+            </cat-nested-slot>
           </slot>
         </cat-slot>
         </body>
@@ -268,8 +270,24 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
+      class NestedChild {
+        bind () {
+          bindCalls.push('nested-child');
+        }
+      }
+
+      const nestedChild = {
+        constructor: NestedChild
+      };
+
       const nestedSlot = {
-        constructor: NestedSlot
+        constructor: NestedSlot,
+        children: [
+          {
+            name: 'nested-child',
+            component: nestedChild
+          }
+        ]
       };
 
       const slot = {
@@ -296,7 +314,8 @@ lab.experiment('browser/DocumentRenderer', () => {
       const expected = [
         'document',
         'slot',
-        'nested-slot'
+        'nested-slot',
+        'nested-child'
       ];
 
       jsdom.env({
