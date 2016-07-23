@@ -34,7 +34,7 @@ lab.experiment('lib/DocumentRenderer', () => {
       documentRenderer.render(routingContext);
     });
 
-    lab.test('should render nothing if no such component', (done) => {
+    lab.test('Should render nothing if no such component', (done) => {
       var html = `
         <!DOCTYPE html>
         <html>
@@ -76,7 +76,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should render nothing if no such head component', (done) => {
+    lab.test('Should render nothing if no such head component', (done) => {
       var html = `
         <!DOCTYPE html>
         <html>
@@ -111,7 +111,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should ignore second head and document tags', (done) => {
+    lab.test('Should ignore second head and document tags', (done) => {
       class Document {
         template (context) {
           return `
@@ -179,7 +179,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render components without watchers', (done) => {
+    lab.test('Should properly render components', (done) => {
       class AsyncComponent {
         template (context) {
           return `<div>test – ${context.name}</div>`;
@@ -275,7 +275,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render local components without conflicts', (done) => {
+    lab.test('Should properly render local components without conflicts', (done) => {
       class Document {
         template (context) {
           return `
@@ -415,7 +415,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render local components without conflicts, in sync mode', (done) => {
+    lab.test('Should properly render local components without conflicts, in sync mode', (done) => {
       class Document {
         template (context) {
           return `
@@ -551,7 +551,327 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render component with watchers', (done) => {
+    lab.test('Should render slot inside another component', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <p>Slot injection</p>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot><slot>
+            <p>Slot injection</p>
+          </slot></cat-slot>
+        </body>
+        </html>
+      `;
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('Should render default slot state if slot content not provided', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot></cat-slot>
+        </body>
+        </html>
+      `;
+
+      class Slot {
+        template () {
+          return '<slot>Default value</slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'slot',
+            component: slot
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot><slot>Default value</slot></cat-slot>
+        </body>
+        </html>
+      `;
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('Should use parent context for components that defined in slot', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <cat-inner-slot></cat-inner-slot>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class InnerSlot {
+        template () {
+          return 'Inner Slot';
+        }
+      }
+
+      var innerSlot = {
+        constructor: InnerSlot
+      };
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'inner-slot',
+            component: innerSlot
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot><slot>
+            <cat-inner-slot>Inner Slot</cat-inner-slot>
+          </slot></cat-slot>
+        </body>
+        </html>
+      `;
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('Should properly render nested slot components', (done) => {
+      var html = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot>
+            <cat-inner-slot></cat-inner-slot>
+          </cat-slot>
+        </body>
+        </html>
+      `;
+
+      class InnerSlotChild {
+        template () {
+          return 'Inner Slot Child';
+        }
+      }
+
+      var innerSlotChild = {
+        constructor: InnerSlotChild
+      };
+
+      class InnerSlot {
+        template () {
+          return '<cat-inner-slot-child></cat-inner-slot-child>';
+        }
+      }
+
+      var innerSlot = {
+        constructor: InnerSlot,
+        children: [
+          {
+            name: 'inner-slot-child',
+            component: innerSlotChild
+          }
+        ]
+      };
+
+      class Slot {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      var slot = {
+        constructor: Slot
+      };
+
+      class Document {
+        template () {
+          return html;
+        }
+      }
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'slot',
+            component: slot
+          },
+          {
+            name: 'inner-slot',
+            component: innerSlot
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+
+      documentRenderer.render(routingContext);
+
+      var expected = `
+        <!DOCTYPE html>
+        <html>
+          <head></head>
+        <body>
+          <cat-slot><slot>
+            <cat-inner-slot><cat-inner-slot-child>Inner Slot Child</cat-inner-slot-child></cat-inner-slot>
+          </slot></cat-slot>
+        </body>
+        </html>
+      `;
+
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
+
+    lab.test('Should properly render component with watchers', (done) => {
       class Document {
         template (context) {
           return `
@@ -647,7 +967,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should render inline script with async actions results', (done) => {
+    lab.test('Should render inline script with async actions results', (done) => {
       class Document {
         template (context) {
           return `
@@ -742,7 +1062,6 @@ lab.experiment('lib/DocumentRenderer', () => {
             </body>
             </html>
           `;
-
       routingContext.middleware.response
         .on('error', done)
         .on('finish', () => {
@@ -751,7 +1070,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should properly render debug info', (done) => {
+    lab.test('Should properly render debug info', (done) => {
       class Document {
         template () {
           return `
@@ -799,7 +1118,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should set code 200 and required headers', (done) => {
+    lab.test('Should set code 200 and required headers', (done) => {
       class Document {
         template () {
           return `
@@ -841,7 +1160,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should set code 302 and Location if redirect in HEAD', (done) => {
+    lab.test('Should set code 302 and Location if redirect in HEAD', (done) => {
       class Document {
         template () {
           return `
@@ -893,7 +1212,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should set header if set cookie in HEAD', (done) => {
+    lab.test('Should set header if set cookie in HEAD', (done) => {
       class Document {
         template () {
           return `
@@ -953,7 +1272,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should pass to the next middleware if notFound()', (done) => {
+    lab.test('Should pass to the next middleware if notFound()', (done) => {
       class Document {
         template () {
           return `
@@ -1005,7 +1324,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should render inline script if clearFragment() in HEAD', (done) => {
+    lab.test('Should render inline script if clearFragment() in HEAD', (done) => {
       class Document {
         template () {
           return `
@@ -1063,7 +1382,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should render inline script if redirect()', (done) => {
+    lab.test('Should render inline script if redirect()', (done) => {
       class Document {
         template () {
           return `
@@ -1127,7 +1446,7 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should render inline script if cookie.set()', (done) => {
+    lab.test('Should render inline script if cookie.set()', (done) => {
       class Document {
         template () {
           return `
@@ -1194,112 +1513,8 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
-    lab.test('should render with errors in signal', (done) => {
-      class Document {
-        template (context) {
-          return `
-            <!DOCTYPE html>
-            <html>
-            <head></head>
-            <body>
-            document – ${context.name}
-            <cat-empty></cat-empty>
-            </body>
-            </html>
-          `
-        }
-
-        render () {
-          return this.$context;
-        }
-      }
-
-      class Head {
-        template (context) {
-          return `<title>${context.head}</title>`;
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      class Empty {
-        template (context) {
-          return `empty - ${context.value || 'empty'}`
-        }
-
-        render () {
-          return this.$context.getWatcherData();
-        }
-      }
-
-      var empty = {
-        constructor: Empty
-      };
-
-      var head = {
-        constructor: Head
-      };
-
-      var document = {
-        name: 'document',
-        constructor: Document,
-        children: [
-          {
-            name: 'head',
-            component: head,
-            watcher: {
-              head: ['head']
-            }
-          },
-          {
-            name: 'empty',
-            component: empty
-          }
-        ]
-      };
-
-      var signalError = 'signal error';
-
-      var routingContext = createRoutingContext(document, {
-        signal: [
-          function (args, state) {
-            state.set('head', 'Test');
-          },
-          function () {
-            throw signalError;
-          }
-        ]
-      });
-
-      var documentRenderer = routingContext.locator.resolve('documentRenderer');
-      documentRenderer._eventBus.on('error', (error) => assert.strictEqual(error, signalError));
-      documentRenderer.render(routingContext);
-
-      var expected = `
-            <!DOCTYPE html>
-            <html>
-            <head><title>Test</title></head>
-            <body>
-            document – document
-            <cat-empty>empty - empty</cat-empty>
-            </body>
-            </html>
-          `;
-
-      routingContext.middleware.response
-        .on('error', done)
-        .on('finish', () => {
-          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
-          done();
-        });
-
-    });
-
-    lab.test('should render with props and parent props data', (done) => {
+    lab.test('Should correct pass props between components', (done) => {
       const testText = 'test';
-
       var html = `
         <!DOCTYPE html>
         <html>
@@ -1309,35 +1524,29 @@ lab.experiment('lib/DocumentRenderer', () => {
         </body>
         </html>
       `;
-
       class Current {
         template (ctx) {
           return `${ctx.text}`;
         }
-
         render () {
           return {
             text: this.$context.props.text
           }
         }
       }
-
       const current = {
         constructor: Current
       };
-
       class Parent {
         template () {
           return `<cat-current></cat-current>`
         }
-
         render () {
           return {
             id: Number(this.$context.attributes['id']) + 1
           };
         }
       }
-
       var parent = {
         constructor: Parent,
         children: [
@@ -1350,13 +1559,11 @@ lab.experiment('lib/DocumentRenderer', () => {
           }
         ]
       };
-
       class Document {
         template () {
           return html;
         }
       }
-
       var document = {
         name: 'document',
         constructor: Document,
@@ -1374,11 +1581,9 @@ lab.experiment('lib/DocumentRenderer', () => {
           }
         ]
       };
-
       var routingContext = createRoutingContext(document);
       var documentRenderer = routingContext.locator.resolve('documentRenderer');
       var eventBus = routingContext.locator.resolve('eventBus');
-
       const expected = `
         <!DOCTYPE html>
         <html>
@@ -1388,12 +1593,9 @@ lab.experiment('lib/DocumentRenderer', () => {
         </body>
         </html>
       `;
-
       eventBus
         .on('error', done);
-
       documentRenderer.render(routingContext);
-
       routingContext.middleware.response
         .on('finish', () => {
           assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
@@ -1401,10 +1603,9 @@ lab.experiment('lib/DocumentRenderer', () => {
         })
         .on('error', done);
     });
-  });
 
-  lab.test('should render recursive components', (done) => {
-    var html = `
+    lab.test('Should render recursive components', (done) => {
+      var html = `
         <!DOCTYPE html>
         <html>
           <head></head>
@@ -1413,61 +1614,52 @@ lab.experiment('lib/DocumentRenderer', () => {
         </body>
         </html>
       `;
-
-    class Recursive {
-      template (ctx) {
-        if (ctx.id > 10) {
-          return;
+      class Recursive {
+        template (ctx) {
+          if (ctx.id > 10) {
+            return;
+          }
+          return `<cat-recursive id="${ctx.id}"></cat-recursive>`;
         }
-
-        return `<cat-recursive id="${ctx.id}"></cat-recursive>`;
-      }
-
-      render () {
-        return {
-          id: Number(this.$context.attributes['id']) + 1
-        };
-      }
-    }
-
-    var recursive = {
-      constructor: Recursive,
-      children: [
-        {
-          name: 'recursive',
-          recursive: true
+        render () {
+          return {
+            id: Number(this.$context.attributes['id']) + 1
+          };
         }
-      ]
-    };
-
-    class Document {
-      template () {
-        return html;
       }
-    }
-
-    var document = {
-      name: 'document',
-      constructor: Document,
-      children: [
-        {
-          name: 'head',
-          component: headComponentMock
-        },
-        {
-          name: 'recursive',
-          component: recursive
+      var recursive = {
+        constructor: Recursive,
+        children: [
+          {
+            name: 'recursive',
+            recursive: true
+          }
+        ]
+      };
+      class Document {
+        template () {
+          return html;
         }
-      ]
-    };
-
-    var routingContext = createRoutingContext(document);
-    var documentRenderer = routingContext.locator.resolve('documentRenderer');
-    var eventBus = routingContext.locator.resolve('eventBus');
-
-    documentRenderer.render(routingContext);
-
-    var expected = `
+      }
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: headComponentMock
+          },
+          {
+            name: 'recursive',
+            component: recursive
+          }
+        ]
+      };
+      var routingContext = createRoutingContext(document);
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      var eventBus = routingContext.locator.resolve('eventBus');
+      documentRenderer.render(routingContext);
+      var expected = `
         <!DOCTYPE html>
         <html>
           <head></head>
@@ -1476,20 +1668,20 @@ lab.experiment('lib/DocumentRenderer', () => {
         </body>
         </html>
       `;
-
-    routingContext.middleware.response
-      .on('error', done)
-      .on('finish', () => {
-        assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
-        done();
-      });
+      routingContext.middleware.response
+        .on('error', done)
+        .on('finish', () => {
+          assert.strictEqual(routingContext.middleware.response.result, expected, 'Wrong HTML');
+          done();
+        });
+    });
   });
 });
 
 function createRoutingContext(documentDescriptor, args = {}, config = {}) {
   var locator = new ServiceLocator();
   locator.registerInstance('serviceLocator', locator);
-  locator.register('documentRenderer', DocumentRenderer, config, true);
+  locator.register('documentRenderer', DocumentRenderer, true);
   locator.registerInstance('config', config);
 
   var eventBus = new events.EventEmitter();

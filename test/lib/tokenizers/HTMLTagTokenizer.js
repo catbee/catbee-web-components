@@ -1,8 +1,8 @@
-var Lab = require('lab');
-var lab = exports.lab = Lab.script();
-var assert = require('assert');
-var tests = require('../../cases/lib/tokenizers/HTMLTagTokenizer.json');
-var HTMLTagTokenizer = require('../../../lib/tokenizers/HTMLTagTokenizer');
+const Lab = require('lab');
+const lab = exports.lab = Lab.script();
+const assert = require('assert');
+const tests = require('../../cases/lib/tokenizers/HTMLTagTokenizer.json');
+const HTMLTagTokenizer = require('../../../lib/tokenizers/HTMLTagTokenizer');
 
 lab.experiment('lib/tokenizers/HTMLTagTokenizer', function () {
   lab.experiment('#next', function () {
@@ -30,7 +30,7 @@ lab.experiment('lib/tokenizers/HTMLTagTokenizer', function () {
 });
 
 function findName(state) {
-  var name = '';
+  let name = '';
   Object.keys(HTMLTagTokenizer.STATES)
     .some(function (key) {
       if (HTMLTagTokenizer.STATES[key] === state) {
