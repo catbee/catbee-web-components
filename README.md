@@ -178,6 +178,52 @@ Every component's $context is extended with the following properties & methods:
 - __this.$context.createComponent('tagName', descriptor, attributesObject)__ – creates a new component's instance and returns a promise of its DOM element.
 - __this.$context.collectGarbage()__ – collects all components which have been created using the createComponent('tagName', attributesObject) method and are not attached to the DOM at the moment.
 
+### Component Slots
+[Slots](https://github.com/w3c/webcomponents/blob/gh-pages/proposals/Slots-Proposal.md) it's part of W3C Web Components specification.
+Slots allow you inject content from parent-to-child. Catbee support bare-bone version of this feature.
+
+Example:
+
+```
+// Child.js
+class Child {
+  template () {
+    return '<slot></slot>'
+  }
+}
+
+module.exports = {
+  constructor: Child
+}
+
+// Parent.js
+class Parent {
+  template () {
+    return '<cat-child>Content injection</cat-child>';
+  }
+}
+
+module.exports = {
+  constructor: Parent,
+  children: [
+    {
+      name: 'child',
+      component: require('./Child')
+    }
+  ]
+}
+
+// Result HTML
+<cat-parent>
+  <cat-child><slot>Content injected</slot></cat-child>
+</cat-parent>
+```
+
+Features supported:
+
+- Inject components (should be described in parent)
+- Default values if content not provided
+
 ### Data flow
 
 Library provides built-in data-flow system.
