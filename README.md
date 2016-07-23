@@ -184,7 +184,7 @@ Slots allow you inject content from parent-to-child. Catbee support bare-bone ve
 
 Example:
 
-```
+```javascript
 // Child.js
 class Child {
   template () {
