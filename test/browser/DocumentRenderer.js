@@ -233,7 +233,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       })
     });
 
-    lab.test('Should correct init slot nested components', { only: true }, (done) => {
+    lab.test('Should correct init slot nested components', (done) => {
       let bindCalls = [];
       let html = `
         <!DOCTYPE html>
@@ -246,6 +246,11 @@ lab.experiment('browser/DocumentRenderer', () => {
             <cat-nested-slot>
               <cat-nested-child></cat-nested-child>
             </cat-nested-slot>
+          </slot>
+        </cat-slot>
+        <cat-slot>
+          <slot>
+            <cat-nested-second></cat-nested-second>
           </slot>
         </cat-slot>
         </body>
@@ -276,6 +281,16 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       }
 
+      class NestedSecond {
+        bind () {
+          bindCalls.push('nested-second');
+        }
+      }
+
+      const nestedSecond = {
+        constructor: NestedSecond
+      };
+
       const nestedChild = {
         constructor: NestedChild
       };
@@ -304,6 +319,10 @@ lab.experiment('browser/DocumentRenderer', () => {
           {
             name: 'nested-slot',
             component: nestedSlot
+          },
+          {
+            name: 'nested-second',
+            component: nestedSecond
           }
         ]
       };
@@ -314,7 +333,9 @@ lab.experiment('browser/DocumentRenderer', () => {
       const expected = [
         'document',
         'slot',
+        'slot',
         'nested-slot',
+        'nested-second',
         'nested-child'
       ];
 
@@ -1825,7 +1846,87 @@ lab.experiment('browser/DocumentRenderer', () => {
             .catch(done);
         }
       });
-    })
+    });
+
+    lab.test('Should correct re-render slot after it initialized on server', (done) => {
+      let renderCalls = 0;
+
+      class Nested {
+        template () {
+          return '<slot></slot>';
+        }
+
+        render () {
+          renderCalls += 1;
+        }
+      }
+
+      class Root {
+
+      }
+
+      class Inner {
+        template () {
+          return 'Content';
+        }
+
+        render () {
+          renderCalls += 1;
+        }
+      }
+
+      const inner = {
+        constructor: Inner
+      };
+
+      const nested = {
+        constructor: Nested
+      };
+
+      const root = {
+        constructor: Root,
+        children: [
+          {
+            name: 'nested',
+            component: nested
+          },
+          {
+            name: 'inner',
+            component: inner
+          }
+        ]
+      };
+
+      let html = `<cat-nested><slot><cat-inner>Content</cat-inner></slot></cat-nested>`;
+
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+
+      const expected = '<slot><cat-inner>Content</cat-inner></slot>';
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html,
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          locator.registerInstance('documentComponent', root);
+
+          const renderer = new DocumentRenderer(locator);
+
+          renderer.initWithState({ args: {} })
+            .then(() => {
+              const nestedComponent = window.document.querySelector('cat-nested');
+              return renderer.renderComponent(nestedComponent, nested)
+                .then(() => {
+                  assert.deepEqual(renderCalls, 2);
+                  assert.deepEqual(nestedComponent.innerHTML, expected, 'Wrong HTML');
+                  done();
+                });
+            })
+            .catch(done);
+        }
+      });
+    });
   });
 
   lab.experiment('#updateState', () => {

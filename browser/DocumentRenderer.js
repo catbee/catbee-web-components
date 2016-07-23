@@ -143,6 +143,7 @@ class DocumentRenderer {
   renderComponent (rootElement, rootContext, renderingContext) {
     const action = (element) => {
       const id = this._getId(element);
+      const localContext = this._localContextProvider.getContextById(id);
       const hadChildrenNodes = (element.children.length > 0);
 
       if (!renderingContext) {
@@ -196,6 +197,8 @@ class DocumentRenderer {
           const tmpElement = element.cloneNode(false);
           tmpElement.innerHTML = html;
 
+          this._updateSlotContent(tmpElement);
+
           if (isHead) {
             this._mergeHead(element, tmpElement);
             return null;
@@ -205,6 +208,22 @@ class DocumentRenderer {
             onBeforeMorphElChildren: (foundElement) =>
             foundElement === element || !moduleHelper.isComponentNode(foundElement)
           });
+
+          // Morphing slot elements
+          let slot = findSlot(element);
+          let fragment = this._componentSlotContents[id];
+
+          if (slot && fragment) {
+            let content = fragment.cloneNode(true);
+
+            Array.from(content.children)
+              .forEach((child) => {
+                child.$parentId = this._localContextProvider.getParentById(id);
+              });
+
+            slot.innerHTML = '';
+            slot.appendChild(content);
+          }
         })
         .then(() => this._bindComponent(element))
         .catch(reason => this._eventBus.emit('error', reason));
@@ -382,7 +401,6 @@ class DocumentRenderer {
   /**
    * Does asynchronous traversal through the components hierarchy.
    * @param {Array} elements Elements to start the search.
-   * @param {Object} components Current set of components.
    * @param {function} action Action for every component.
    * @returns {Promise} Promise for the finished traversal.
    * @private
@@ -461,15 +479,23 @@ class DocumentRenderer {
 
         const slot = findSlot(element);
 
-        if (slot && slot.children.length > 0) {
-          const children = Array.from(slot.children);
+        // If slot node provided in any child component and it's not empty, inner content
+        // of it should be re-hydrated for later usage during re-render.
+        if (slot && slot.childNodes.length > 0) {
+          const childNodes = Array.from(slot.childNodes);
 
-          this._componentSlotContents[id] = children.reduce((fragment, child) => {
-            child.$parentId = this._localContextProvider.getParentById(id);
-            fragment.appendChild(child.cloneNode(false));
+          this._componentSlotContents[id] = childNodes.reduce((fragment, child) => {
+            const isComponent = moduleHelper.isComponentNode(child);
+
+            if (isComponent) {
+              child.$parentId = this._localContextProvider.getParentById(id);
+            }
+
+            const clonedNode = child.cloneNode(!isComponent);
+            fragment.appendChild(clonedNode);
             return fragment;
           }, this._window.document.createDocumentFragment());
-        } // Rehydrate slot contents from server rendered nodes
+        }
 
         return this._bindWatcher(localContext, element)
           .then(() => this._bindComponent(element));
@@ -814,6 +840,41 @@ class DocumentRenderer {
   }
 
   /**
+   * Update slot content
+   * @param {Element} root
+   * @private
+   */
+  _updateSlotContent (root) {
+    const queue = [root];
+
+    // does breadth-first search inside the root element
+    while (queue.length > 0) {
+      const currentChildren = queue.shift().children;
+
+      if (!currentChildren) {
+        continue;
+      }
+
+      Array.prototype.forEach.call(currentChildren, (currentChild) => {
+        // and they should be components
+        if (!moduleHelper.isComponentNode(currentChild)) {
+          queue.push(currentChild);
+          return;
+        }
+
+        const fragment = this._window.document.createDocumentFragment();
+        const id = this._getId(currentChild);
+        const childNodes = Array.from(currentChild.childNodes);
+
+        if (childNodes.length > 0) {
+          childNodes.forEach((child) => fragment.appendChild(child.cloneNode(true)));
+          this._componentSlotContents[id] = fragment;
+        }
+      });
+    }
+  }
+
+  /**
    * Finds all rendering roots on the page for all changed stores.
    * @param {Array} [changedComponentsIds=[]] - List of changed store's names.
    * @returns {Array<Element>} HTML elements that are rendering roots.
@@ -980,7 +1041,10 @@ class DocumentRenderer {
           return;
         }
 
-        currentChild.$parentId = rootId;
+        if (!currentChild.$parentId) {
+          currentChild.$parentId = rootId;
+        }
+
         elements.push(currentChild);
       });
     }
