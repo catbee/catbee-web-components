@@ -126,7 +126,14 @@ class DocumentRenderer {
           return;
         }
 
-        return this._stateManager.signal(signal, args);
+        const updateSignal = this._stateManager.signal(signal, args);
+
+        this._eventBus.emit('stateUpdated', {
+          routingContext: routingContext,
+          signal: updateSignal
+        });
+
+        return updateSignal;
       })
       .then(() => {
         this._isSilentUpdateQueued = false;
