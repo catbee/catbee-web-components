@@ -152,6 +152,7 @@ class DocumentRenderer {
       const id = this._getId(element);
       const localContext = this._localContextProvider.getContextById(id);
       const hadChildrenNodes = (element.children.length > 0);
+      let isInitialRender = false;
 
       if (!renderingContext) {
         renderingContext = this._createRenderingContext();
@@ -168,6 +169,7 @@ class DocumentRenderer {
       const ComponentConstructor = localContext.constructor;
 
       if (!instance) {
+        isInitialRender = true;
         ComponentConstructor.prototype.$context = this._getComponentContext(localContext, element);
         instance = new ComponentConstructor(this._locator);
         instance.$context = ComponentConstructor.prototype.$context;
@@ -176,64 +178,73 @@ class DocumentRenderer {
 
       this._componentElements[id] = element;
 
-      return Promise.resolve()
-        .then(() => {
-          // we need to unbind the whole hierarchy only at
-          // the beginning, not for any new elements
-          if (!(id in renderingContext.rootIds) || !hadChildrenNodes) {
+      const shouldComponentUpdateMethod = moduleHelper.getMethodToInvoke(instance, 'shouldComponentUpdate');
+
+      return moduleHelper.getSafePromise(shouldComponentUpdateMethod)
+        .then((isShouldComponentUpdate = true) => {
+          if (!isShouldComponentUpdate && !isInitialRender) {
             return null;
           }
 
-          return this._unbindAll(element, renderingContext);
-        })
-        .catch((reason) => this._eventBus.emit('error', reason))
-        .then(() => this._bindWatcher(localContext, element))
-        .then(() => {
-          const renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
-          return moduleHelper.getSafePromise(renderMethod);
-        })
-        .then((dataContext) => instance.template(dataContext))
-        .catch((reason) => this._handleRenderError(element, reason))
-        .then(html => {
-          const isHead = element.tagName === TAG_NAMES.HEAD;
+          return Promise.resolve()
+            .then(() => {
+              // we need to unbind the whole hierarchy only at
+              // the beginning, not for any new elements
+              if (!(id in renderingContext.rootIds) || !hadChildrenNodes) {
+                return null;
+              }
 
-          if (html === '' && isHead) {
-            return null;
-          }
+              return this._unbindAll(element, renderingContext);
+            })
+            .catch((reason) => this._eventBus.emit('error', reason))
+            .then(() => this._bindWatcher(localContext, element))
+            .then(() => {
+              const renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
+              return moduleHelper.getSafePromise(renderMethod);
+            })
+            .then((dataContext) => instance.template(dataContext))
+            .catch((reason) => this._handleRenderError(element, reason))
+            .then(html => {
+              const isHead = element.tagName === TAG_NAMES.HEAD;
 
-          const tmpElement = element.cloneNode(false);
-          tmpElement.innerHTML = html;
+              if (html === '' && isHead) {
+                return null;
+              }
 
-          this._updateSlotContent(tmpElement);
+              const tmpElement = element.cloneNode(false);
+              tmpElement.innerHTML = html;
 
-          if (isHead) {
-            this._mergeHead(element, tmpElement);
-            return null;
-          }
+              this._updateSlotContent(tmpElement);
 
-          morphdom(element, tmpElement, {
-            onBeforeMorphElChildren: (foundElement) =>
-            foundElement === element || !moduleHelper.isComponentNode(foundElement)
-          });
+              if (isHead) {
+                this._mergeHead(element, tmpElement);
+                return null;
+              }
 
-          // Morphing slot elements
-          let slot = findSlot(element);
-          let fragment = this._componentSlotContents[id];
-
-          if (slot && fragment) {
-            let content = fragment.cloneNode(true);
-
-            Array.from(content.children)
-              .forEach((child) => {
-                child.$parentId = this._localContextProvider.getParentById(id);
+              morphdom(element, tmpElement, {
+                onBeforeMorphElChildren: (foundElement) =>
+                foundElement === element || !moduleHelper.isComponentNode(foundElement)
               });
 
-            slot.innerHTML = '';
-            slot.appendChild(content);
-          }
+              // Morphing slot elements
+              let slot = findSlot(element);
+              let fragment = this._componentSlotContents[id];
+
+              if (slot && fragment) {
+                let content = fragment.cloneNode(true);
+
+                Array.from(content.children)
+                  .forEach((child) => {
+                    child.$parentId = this._localContextProvider.getParentById(id);
+                  });
+
+                slot.innerHTML = '';
+                slot.appendChild(content);
+              }
+            })
+            .then(() => this._bindComponent(element));
         })
-        .then(() => this._bindComponent(element))
-        .catch(reason => this._eventBus.emit('error', reason));
+        .catch((reason) => this._eventBus.emit('error', reason));
     };
 
     return this._traverseComponentsWithContext([rootElement], action, rootContext)

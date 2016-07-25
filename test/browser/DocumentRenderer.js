@@ -426,6 +426,93 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
+    lab.test('Should block render if shouldComponentUpdate return false', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+      let renderCount = 0;
+
+      const expected = 'test<br><div>Hello, World 1!</div>';
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          class Component {
+            template () {
+              renderCount += 1;
+              return `test<br><div>Hello, World ${renderCount}!</div>`;
+            }
+
+            shouldComponentUpdate () {
+              return false;
+            }
+          }
+
+          locator.registerInstance('window', window);
+
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
+
+          renderer.renderComponent(element, { constructor: Component })
+            .then(() => {
+              assert.strictEqual(element.innerHTML, expected);
+              assert.strictEqual(renderCount, 1);
+              return renderer.renderComponent(element, { constructor: Component });
+            })
+            .then(() => {
+              assert.strictEqual(element.innerHTML, expected);
+              assert.strictEqual(renderCount, 1);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
+    lab.test('Should not block render if shouldComponentUpdate return true', (done) => {
+      const locator = createLocator();
+      const eventBus = locator.resolve('eventBus');
+      let renderCount = 0;
+
+      const expected1 = 'test<br><div>Hello, World 1!</div>';
+      const expected2 = 'test<br><div>Hello, World 2!</div>';
+
+      eventBus.on('error', done);
+      jsdom.env({
+        html: ' ',
+        done: function (errors, window) {
+          class Component {
+            template () {
+              renderCount += 1;
+              return `test<br><div>Hello, World ${renderCount}!</div>`;
+            }
+
+            shouldComponentUpdate () {
+              return true;
+            }
+          }
+
+          locator.registerInstance('window', window);
+
+          const renderer = new DocumentRenderer(locator);
+          const element = window.document.createElement('cat-test');
+
+          renderer.renderComponent(element, { constructor: Component })
+            .then(() => {
+              assert.strictEqual(element.innerHTML, expected1);
+              assert.strictEqual(renderCount, 1);
+              return renderer.renderComponent(element, { constructor: Component });
+            })
+            .then(() => {
+              assert.strictEqual(element.innerHTML, expected2);
+              assert.strictEqual(renderCount, 2);
+              done();
+            })
+            .catch(done);
+        }
+      });
+    });
+
     lab.test('Should render debug output instead the content when error in debug mode', (done) => {
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
