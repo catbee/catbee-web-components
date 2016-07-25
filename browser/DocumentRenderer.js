@@ -830,6 +830,14 @@ class DocumentRenderer {
     const changedComponentsIds = Object.keys(this._currentChangedComponents);
     let renderingContext = this._createRenderingContext(changedComponentsIds);
 
+    // we should update contexts of the components with the new routing context
+    Object.keys(this._componentInstances)
+      .forEach(id => {
+        const instance = this._componentInstances[id];
+        const context = this._localContextProvider.getContextById(id);
+        instance.$context = this._getComponentContext(context, instance.$context.element);
+      });
+
     this._currentChangedComponents = Object.create(null);
 
     var promises = renderingContext.roots.map(root => {
