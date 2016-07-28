@@ -148,6 +148,9 @@ class DocumentRenderer {
    * @param {Object} [renderingContext] - Component rendering context
    */
   renderComponent (rootElement, rootContext, renderingContext) {
+    const componentName = moduleHelper.getOriginalComponentName(rootElement.tagName);
+    this._eventBus.emit('componentRender', componentName);
+
     const action = (element) => {
       const id = this._getId(element);
       const localContext = this._localContextProvider.getContextById(id);
@@ -231,6 +234,9 @@ class DocumentRenderer {
             slot.innerHTML = '';
             slot.appendChild(content);
           }
+        })
+        .then(() => {
+          this._eventBus.emit('componentRendered', componentName);
         })
         .then(() => this._bindComponent(element))
         .catch(reason => this._eventBus.emit('error', reason));
@@ -563,6 +569,10 @@ class DocumentRenderer {
             NON_BUBBLING_EVENTS.hasOwnProperty(eventName)
           );
         });
+      })
+      .then(() => {
+        const componentName = moduleHelper.getOriginalComponentName(element.tagName);
+        this._eventBus.emit('componentBound', componentName)
       });
   }
 
@@ -574,6 +584,8 @@ class DocumentRenderer {
    * @private
    */
   _bindWatcher (localContext, element) {
+    const componentName = moduleHelper.getOriginalComponentName(element.tagName);
+
     return Promise.resolve()
       .then(() => {
         var id = this._getId(element);
@@ -589,8 +601,13 @@ class DocumentRenderer {
         }
 
         var watcher = this._stateManager.getWatcher(watcherDefinition);
-        watcher.on('update', () => this._eventBus.emit('componentStateChanged', id));
+        watcher.on('update', () => {
+          this._eventBus.emit('componentStateChanged', id);
+        });
         this._componentWatchers[id] = watcher;
+      })
+      .then(() => {
+        this._eventBus.emit('componentBindWatcher', componentName);
       });
   }
 
@@ -663,7 +680,7 @@ class DocumentRenderer {
       const id = this._getId(innerElement);
       renderingContext.unboundIds[id] = true;
       return this._unbindComponent(innerElement)
-        .then(() => this._unbindWatcher(id));
+        .then(() => this._unbindWatcher(innerElement));
     };
 
     return this._traverseComponents([element], action);
@@ -697,16 +714,21 @@ class DocumentRenderer {
 
     const unbindMethod = moduleHelper.getMethodToInvoke(instance, 'unbind');
     return moduleHelper.getSafePromise(unbindMethod)
+      .then(() => {
+        const componentName = moduleHelper.getOriginalComponentName(element.tagName);
+        this._eventBus.emit('componentUnbound', componentName)
+      })
       .catch(reason => this._eventBus.emit('error', reason));
   }
 
   /**
    * Unbind state tree watcher.
-   * @param {String} id - Component's ID.
+   * @param {Element} element - Component's element
    * @private
    */
-  _unbindWatcher (id) {
-    var watcher = this._componentWatchers[id];
+  _unbindWatcher (element) {
+    const id = this._getId(element);
+    const watcher = this._componentWatchers[id];
 
     if (!watcher) {
       return;
@@ -715,6 +737,9 @@ class DocumentRenderer {
     watcher.off('update');
     watcher.release();
     delete this._componentWatchers[id];
+
+    const componentName = moduleHelper.getOriginalComponentName(element.tagName);
+    this._eventBus.emit('componentUnbindWatcher', componentName);
   }
 
   /**
