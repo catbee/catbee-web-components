@@ -495,17 +495,36 @@ class DocumentRenderer {
         // If slot node provided in any child component and it's not empty, inner content
         // of it should be re-hydrated for later usage during re-render.
         if (slot && slot.childNodes.length > 0) {
-          const childNodes = Array.from(slot.childNodes);
+          const root = slot.cloneNode(true);
+          const treeWalker = this._window.document.createTreeWalker(root);
+          const hydratedTreeWalker = this._window.document.createTreeWalker(slot);
 
-          this._componentSlotContents[id] = childNodes.reduce((fragment, child) => {
-            const isComponent = moduleHelper.isComponentNode(child);
+          while (hydratedTreeWalker.nextNode()) {
+            let isComponent = moduleHelper.isComponentNode(hydratedTreeWalker.currentNode);
 
             if (isComponent) {
-              child.$parentId = this._localContextProvider.getParentById(id);
+              hydratedTreeWalker.currentNode.$parentId = id;
             }
+          }
 
-            const clonedNode = child.cloneNode(!isComponent);
-            fragment.appendChild(clonedNode);
+          while (treeWalker.nextNode()) {
+            let isComponent = moduleHelper.isComponentNode(treeWalker.currentNode);
+
+            if (isComponent) {
+              const currentNode = treeWalker.currentNode;
+
+              while (currentNode.firstChild) {
+                currentNode.removeChild(currentNode.firstChild);
+              } // Cleanup child nodes inside component nodes
+
+              currentNode.$parentId = id;
+            }
+          }
+
+          const childNodes = Array.from(root.childNodes);
+
+          this._componentSlotContents[id] = childNodes.reduce((fragment, child) => {
+            fragment.appendChild(child);
             return fragment;
           }, this._window.document.createDocumentFragment());
         }
