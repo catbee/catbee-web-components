@@ -190,7 +190,7 @@ class DocumentRenderer {
           return this._unbindAll(element, renderingContext);
         })
         .catch((reason) => this._eventBus.emit('error', reason))
-        .then(() => this._bindWatcher(localContext, element))
+        .then(() => this._bindWatcher(element))
         .then(() => {
           const renderMethod = moduleHelper.getMethodToInvoke(instance, 'render');
           return moduleHelper.getSafePromise(renderMethod);
@@ -218,27 +218,12 @@ class DocumentRenderer {
             onBeforeMorphElChildren: (foundElement) =>
             foundElement === element || !moduleHelper.isComponentNode(foundElement)
           });
-
-          // Morphing slot elements
-          let slot = findSlot(element);
-          let fragment = this._componentSlotContents[id];
-
-          if (slot && fragment) {
-            let content = fragment.cloneNode(true);
-
-            Array.from(content.children)
-              .forEach((child) => {
-                child.$parentId = this._localContextProvider.getParentById(id);
-              });
-
-            slot.innerHTML = '';
-            slot.appendChild(content);
-          }
         })
+        .then(() => this._morphSlot(element))
         .then(() => {
           this._eventBus.emit('componentRendered', componentName);
+          return this._bindComponent(element)
         })
-        .then(() => this._bindComponent(element))
         .catch(reason => this._eventBus.emit('error', reason));
     };
 
@@ -490,29 +475,84 @@ class DocumentRenderer {
         this._componentElements[id] = element;
         this._componentInstances[id] = instance;
 
-        const slot = findSlot(element);
-
-        // If slot node provided in any child component and it's not empty, inner content
-        // of it should be re-hydrated for later usage during re-render.
-        if (slot && slot.childNodes.length > 0) {
-          const childNodes = Array.from(slot.childNodes);
-
-          this._componentSlotContents[id] = childNodes.reduce((fragment, child) => {
-            const isComponent = moduleHelper.isComponentNode(child);
-
-            if (isComponent) {
-              child.$parentId = this._localContextProvider.getParentById(id);
-            }
-
-            const clonedNode = child.cloneNode(!isComponent);
-            fragment.appendChild(clonedNode);
-            return fragment;
-          }, this._window.document.createDocumentFragment());
-        }
-
-        return this._bindWatcher(localContext, element)
+        return this._rehydrateComponent(element)
+          .then(() => this._bindWatcher(element))
           .then(() => this._bindComponent(element));
       });
+  }
+
+  /**
+   * Traverse thru element children and collect slot contents, that was rendered on server.
+   * Collected content will be used as template when component be next time re-rendered.
+   * Also this method attach parentId to slot components.
+   * @param {Element} element
+   * @return {Promise}
+   * @private
+   */
+  _rehydrateComponent (element) {
+    return Promise.resolve()
+      .then(() => {
+        const slot = findSlot(element);
+        const id = this._getId(element);
+
+        if (!slot || slot.childNodes.length === 0) {
+          return;
+        }
+
+        const collectorNode = slot.cloneNode(true);
+        const collectorTreeWalker = this._window.document.createTreeWalker(collectorNode);
+        const nestedComponents = this._findNestedComponents(slot);
+
+        // First-of-all we should attach correct parent id to all child components.
+        nestedComponents.forEach((component) => component.$parentId = this._localContextProvider.getParentById(id));
+
+        // At next step we should collect template for component slots storage
+        while (collectorTreeWalker.nextNode()) {
+          let isComponent = moduleHelper.isComponentNode(collectorTreeWalker.currentNode);
+
+          if (isComponent) {
+            const currentNode = collectorTreeWalker.currentNode;
+
+            while (currentNode.firstChild) {
+              currentNode.removeChild(currentNode.firstChild);
+            } // We should have clean <cat-*> in template
+          }
+        }
+
+        const childNodes = Array.from(collectorNode.childNodes);
+
+        // At end we save document fragment that contains template inside
+        this._componentSlotContents[id] = childNodes.reduce((fragment, child) => {
+          fragment.appendChild(child);
+          return fragment;
+        }, this._window.document.createDocumentFragment());
+      });
+  }
+
+  /**
+   * Morph <slot> tag inside component
+   * @param {Element} element
+   * @private
+   */
+  _morphSlot (element) {
+    const slot = findSlot(element);
+    const id = this._getId(element);
+    const slotContentTemplate = this._componentSlotContents[id];
+
+    if (!slot || !slotContentTemplate) {
+      return;
+    }
+
+    let slotContent = slotContentTemplate.cloneNode(true);
+    let nestedComponents = this._findNestedComponents(slotContent);
+
+    nestedComponents.forEach((component) => component.$parentId = this._localContextProvider.getParentById(id));
+
+    while (slot.firstChild) {
+      slot.removeChild(slot.firstChild);
+    } // We should have clean content inside slot before add new elements
+
+    slot.appendChild(slotContent);
   }
 
   /**
@@ -578,19 +618,19 @@ class DocumentRenderer {
 
   /**
    * Bind state tree watcher
-   * @param {Object} localContext - Component details.
    * @param {Element} element - Component's HTML element.
    * @returns {Promise}
    * @private
    */
-  _bindWatcher (localContext, element) {
+  _bindWatcher (element) {
     const componentName = moduleHelper.getOriginalComponentName(element.tagName);
 
     return Promise.resolve()
       .then(() => {
-        var id = this._getId(element);
-        var attributes = attributesToObject(element.attributes);
-        var watcherDefinition = localContext.watcher;
+        let id = this._getId(element);
+        let attributes = attributesToObject(element.attributes);
+        let localContext = this._localContextProvider.getContextById(id);
+        let watcherDefinition = localContext.watcher;
 
         if (!watcherDefinition) {
           return;
@@ -769,6 +809,7 @@ class DocumentRenderer {
     delete this._componentElements[id];
     delete this._componentInstances[id];
     delete this._componentBindings[id];
+    delete this._componentSlotContents[id];
   }
 
   /**

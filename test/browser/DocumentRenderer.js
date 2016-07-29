@@ -243,9 +243,15 @@ lab.experiment('browser/DocumentRenderer', () => {
         <body>
         <cat-slot>
           <slot>
+            <div></div>
+            <div>
             <cat-nested-slot>
-              <cat-nested-child></cat-nested-child>
+              <div></div>
+              <div>
+                <cat-nested-child></cat-nested-child>
+              </div>
             </cat-nested-slot>
+            </div>
           </slot>
         </cat-slot>
         <cat-slot>
@@ -1848,7 +1854,7 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
-    lab.test('Should correct re-render slot after it initialized on server', (done) => {
+    lab.test('Should correct re-render slot after it rendered on server', (done) => {
       let renderCalls = 0;
 
       class Nested {
@@ -1897,12 +1903,12 @@ lab.experiment('browser/DocumentRenderer', () => {
         ]
       };
 
-      let html = `<cat-nested><slot><cat-inner>Content</cat-inner></slot></cat-nested>`;
+      let html = `<cat-nested><slot><div><cat-inner>Content</cat-inner></div></slot></cat-nested>`;
 
       const locator = createLocator();
       const eventBus = locator.resolve('eventBus');
 
-      const expected = '<slot><cat-inner>Content</cat-inner></slot>';
+      const expected = '<slot><div><cat-inner>Content</cat-inner></div></slot>';
 
       eventBus.on('error', done);
       jsdom.env({
