@@ -1,9 +1,9 @@
-class HeadMock {
+class EmptyComponent {
   template () {
     return '';
   }
 }
 
 module.exports = {
-  constructor: HeadMock
+  constructor: EmptyComponent
 };

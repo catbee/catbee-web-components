@@ -9,7 +9,9 @@ class ModuleApiProvider {
 
     const contextBase = Object.create(this);
 
-    documentRenderer.updateState(Object.assign(contextBase, routeDefinition));
+    documentRenderer.updateState(
+      Object.assign(contextBase, routeDefinition)
+    );
   }
 }
 
