@@ -26,7 +26,7 @@
     "baobab": "^2.3.3",
     "browser-process-hrtime": "^0.1.2",
     "entities": "^1.1.1",
-    "morphdom": "^1.3.0",
+    "morphdom": "^2.0.4",
     "pretty-hrtime": "^1.0.2",
     "uuid": "^2.0.2"
   },
