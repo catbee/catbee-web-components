@@ -25,7 +25,8 @@
     "async-writer": "^1.4.2",
     "browser-process-hrtime": "^0.1.2",
     "catberry-uri": "^3.1.0",
-    "pretty-hrtime": "^1.0.2"
+    "pretty-hrtime": "^1.0.2",
+    "uuid": "^2.0.2"
   },
   "devDependencies": {
     "catberry-locator": "^2.1.0",
