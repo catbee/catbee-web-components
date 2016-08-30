@@ -1933,6 +1933,122 @@ lab.experiment('browser/DocumentRenderer', () => {
         }
       });
     });
+
+    lab.test('Should correct re-render multiple slots', (done) => {
+      class Component1 {
+        template () {
+          return '<cat-slot-one>4</cat-slot-one>';
+        }
+      }
+
+      class Component2 {
+        template () {
+          return '<cat-slot-two>3</cat-slot-two>';
+        }
+      }
+
+      class SlotComponent {
+        template () {
+          return '<slot></slot>';
+        }
+      }
+
+      const slotComponent = {
+        constructor: SlotComponent
+      };
+
+      const component2 = {
+        constructor: Component2,
+        children: [
+          {
+            name: 'slot-two',
+            component: slotComponent
+          }
+        ]
+      };
+
+      const component1 = {
+        constructor: Component1,
+        children: [
+          {
+            name: 'slot-one',
+            component: slotComponent
+          }
+        ]
+      };
+
+      const document = {
+        constructor: class Document {},
+        children: [
+          {
+            name: 'test1',
+            component: component1,
+            watcher: {
+              update: ['update']
+            }
+          },
+          {
+            name: 'test2',
+            component: component2,
+            watcher: {
+              update: ['update']
+            }
+          }
+        ]
+      };
+
+      const html = `
+        <cat-test1><cat-slot-one><slot>1</slot></cat-slot-one></cat-test1>
+        <cat-test2><cat-slot-two><slot>2</slot></cat-slot-two></cat-test2>
+      `;
+
+      const locator = createLocator(document);
+      const eventBus = locator.resolve('eventBus');
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: html,
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+
+          renderer.initWithState({
+              args: {
+                signal: [
+                  function (args, state) {
+                    state.set('update', 'initial');
+                  }
+                ]
+              }
+            })
+            .then(() => {
+              return renderer.updateState({
+                args: {
+                  signal: [
+                    function (args, state) {
+                      state.set('update', 'updated');
+                    }
+                  ]
+                }
+              });
+            })
+            .then(() => {
+              // We need wait some time to all updates called
+              setTimeout(function () {
+                try {
+                  const result = window.document.body.innerHTML.trim();
+                  assert.deepEqual(result, `<cat-test1><cat-slot-one><slot>4</slot></cat-slot-one></cat-test1>
+        <cat-test2><cat-slot-two><slot>3</slot></cat-slot-two></cat-test2>`)
+                } catch (e) {
+                  done(e);
+                }
+                done();
+              }, 10);
+            })
+            .catch(done);
+        }
+      });
+    });
   });
 
   lab.experiment('#updateState', () => {

@@ -207,19 +207,89 @@ class DocumentRenderer {
           const tmpElement = element.cloneNode(false);
           tmpElement.innerHTML = html;
 
-          this._updateSlotContent(tmpElement);
-
           if (isHead) {
             this._mergeHead(element, tmpElement);
             return null;
           }
 
           morphdom(element, tmpElement, {
-            onBeforeMorphElChildren: (foundElement) =>
-            foundElement === element || !moduleHelper.isComponentNode(foundElement)
+            onNodeAdded: (node) => {
+              // If element is <slot> we try fill it with content.
+              if (moduleHelper.isSlotNode(node)) {
+                const slotContentTemplate = this._componentSlotContents[id];
+
+                if (!slotContentTemplate) {
+                  return;
+                }
+
+                let slotContent = slotContentTemplate.cloneNode(true);
+                let nestedComponents = this._findNestedComponents(slotContent);
+
+                nestedComponents.forEach((component) =>
+                  component.$parentId = this._localContextProvider.getParentById(id));
+
+                while (node.firstChild) {
+                  node.removeChild(node.firstChild);
+                } // We should have clean content inside slot before add new elements
+
+                node.appendChild(slotContent);
+                return false;
+              }
+
+              // We save childNodes inside component as slot content.
+              if (moduleHelper.isComponentNode(node)) {
+                const id = this._getId(node);
+                const clonedNode = node.cloneNode(true);
+                const childNodes = Array.from(clonedNode.childNodes);
+
+                if (childNodes.length) {
+                  this._componentSlotContents[id] = childNodes.reduce((fragment, child) => {
+                    fragment.appendChild(child);
+                    return fragment;
+                  }, this._window.document.createDocumentFragment());
+                }
+              }
+            },
+
+            onBeforeElChildrenUpdated: (foundElement, foundTmpElement) => {
+              // If element is <slot> we try fill it with content.
+              if (moduleHelper.isSlotNode(foundElement)) {
+                const slotContentTemplate = this._componentSlotContents[id];
+
+                if (!slotContentTemplate) {
+                  return true;
+                }
+
+                let slotContent = slotContentTemplate.cloneNode(true);
+                let nestedComponents = this._findNestedComponents(slotContent);
+
+                nestedComponents.forEach((component) =>
+                  component.$parentId = this._localContextProvider.getParentById(id));
+
+                while (foundElement.firstChild) {
+                  foundElement.removeChild(foundElement.firstChild);
+                } // We should have clean content inside slot before add new elements
+
+                foundElement.appendChild(slotContent);
+                return false;
+              }
+
+              if (foundElement !== element && moduleHelper.isComponentNode(foundElement)) {
+                const childNodes = Array.from(foundTmpElement.childNodes);
+                const id = this._getId(foundElement);
+
+                if (childNodes.length) {
+                  this._componentSlotContents[id] = childNodes.reduce((fragment, child) => {
+                    fragment.appendChild(child);
+                    return fragment;
+                  }, this._window.document.createDocumentFragment());
+                }
+              }
+
+              return foundElement === element || !moduleHelper.isComponentNode(foundElement);
+            }
           });
         })
-        .then(() => this._morphSlot(element))
         .then(() => {
           this._eventBus.emit('componentRendered', componentName);
           return this._bindComponent(element)
@@ -527,32 +597,6 @@ class DocumentRenderer {
           return fragment;
         }, this._window.document.createDocumentFragment());
       });
-  }
-
-  /**
-   * Morph <slot> tag inside component
-   * @param {Element} element
-   * @private
-   */
-  _morphSlot (element) {
-    const slot = findSlot(element);
-    const id = this._getId(element);
-    const slotContentTemplate = this._componentSlotContents[id];
-
-    if (!slot || !slotContentTemplate) {
-      return;
-    }
-
-    let slotContent = slotContentTemplate.cloneNode(true);
-    let nestedComponents = this._findNestedComponents(slotContent);
-
-    nestedComponents.forEach((component) => component.$parentId = this._localContextProvider.getParentById(id));
-
-    while (slot.firstChild) {
-      slot.removeChild(slot.firstChild);
-    } // We should have clean content inside slot before add new elements
-
-    slot.appendChild(slotContent);
   }
 
   /**
@@ -918,41 +962,6 @@ class DocumentRenderer {
       .then(() => {
         this._isUpdating = false;
       });
-  }
-
-  /**
-   * Update slot content
-   * @param {Element} root
-   * @private
-   */
-  _updateSlotContent (root) {
-    const queue = [root];
-
-    // does breadth-first search inside the root element
-    while (queue.length > 0) {
-      const currentChildren = queue.shift().children;
-
-      if (!currentChildren) {
-        continue;
-      }
-
-      Array.prototype.forEach.call(currentChildren, (currentChild) => {
-        // and they should be components
-        if (!moduleHelper.isComponentNode(currentChild)) {
-          queue.push(currentChild);
-          return;
-        }
-
-        const fragment = this._window.document.createDocumentFragment();
-        const id = this._getId(currentChild);
-        const childNodes = Array.from(currentChild.childNodes);
-
-        if (childNodes.length > 0) {
-          childNodes.forEach((child) => fragment.appendChild(child.cloneNode(true)));
-          this._componentSlotContents[id] = fragment;
-        }
-      });
-    }
   }
 
   /**
