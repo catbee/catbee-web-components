@@ -95,7 +95,8 @@ class DocumentRenderer {
           return;
         }
 
-        return this._stateManager.signal(signal, args, this._window.CATBEE_CACHE);
+        const cache = Array.isArray(this._window.CATBEE_CACHE) ? this._window.CATBEE_CACHE : [];
+        return this._stateManager.signal(signal, args, cache);
       })
       .then(() => {
         this._stateManager.tree.commit();
