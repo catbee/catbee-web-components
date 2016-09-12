@@ -298,8 +298,7 @@ class DocumentRenderer {
         .catch(reason => this._eventBus.emit('error', reason));
     };
 
-    return this._traverseComponentsWithContext([rootElement], action, rootContext)
-      .then(() => this._collectRenderingGarbage(renderingContext));
+    return this._traverseComponentsWithContext([rootElement], action, rootContext);
   }
 
   /**
@@ -960,6 +959,7 @@ class DocumentRenderer {
 
     return Promise.all(promises)
       .catch(reason => this._eventBus.emit('error', reason))
+      .then(() => this._collectRenderingGarbage(renderingContext))
       .then(() => {
         this._isUpdating = false;
       });
