@@ -5,7 +5,7 @@ const ServiceLocator = require('catberry-locator');
 const events = require('events');
 const { URI } = require('catberry-uri');
 const ServerResponse = require('../mocks/ServerResponse');
-const { register } = require('../../index');
+const DocumentRenderer = require('../../index');
 const DocumentComponent = require('../mocks/DocumentComponent');
 
 lab.experiment('lib/DocumentRenderer', () => {
@@ -13,7 +13,6 @@ lab.experiment('lib/DocumentRenderer', () => {
     lab.test('Should render document with empty state object if signal not passed', (done) => {
       const routingContext = createRoutingContext(DocumentComponent);
       const documentRenderer = routingContext.locator.resolve('documentRenderer');
-      const eventBus = routingContext.locator.resolve('eventBus');
 
       documentRenderer.render(routingContext);
 
@@ -37,7 +36,7 @@ function createRoutingContext(documentComponent, args = {}, config = {}) {
 
   eventBus.on('error', (error) => {});
 
-  register(locator, documentComponent);
+  DocumentRenderer.register(locator, documentComponent);
 
   const response = new ServerResponse();
 

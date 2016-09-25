@@ -4,7 +4,7 @@ class DocumentComponent {
 <!DOCTYPE html>
 <html>
 <head></head>
-<body><cat-test></cat-test></body>
+<body></body>
 </html>
 `;
   }
