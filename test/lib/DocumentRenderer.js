@@ -1315,6 +1315,63 @@ lab.experiment('lib/DocumentRenderer', () => {
         });
     });
 
+    lab.test('Should set code 302, Location, Set-Cookie if redirect and set cookie in HEAD', (done) => {
+      class Document {
+        template () {
+          return `
+            <!DOCTYPE html>
+            <html>
+            <head></head>
+            <body>
+            </body>
+            </html>
+          `
+        }
+      }
+
+      class Head {
+        render () {
+          this.$context.cookie.set({
+            key: 'first',
+            value: 'value1'
+          });
+          this.$context.redirect('/to/garden');
+        }
+      }
+
+      var head = {
+        constructor: Head
+      };
+
+      var document = {
+        name: 'document',
+        constructor: Document,
+        children: [
+          {
+            name: 'head',
+            component: head
+          }
+        ]
+      };
+
+      var routingContext = createRoutingContext(document);
+      var response = routingContext.middleware.response;
+
+      var documentRenderer = routingContext.locator.resolve('documentRenderer');
+      documentRenderer.render(routingContext);
+
+      response
+        .on('error', done)
+        .on('finish', function () {
+          assert.strictEqual(response.result, '', 'Should be empty content');
+          assert.strictEqual(response.status, 302);
+          assert.strictEqual(Object.keys(response.setHeaders).length, 2);
+          assert.strictEqual(response.setHeaders.Location, '/to/garden');
+          assert.deepEqual(response.setHeaders['Set-Cookie'], ['first=value1']);
+          done();
+        });
+    });
+
     lab.test('Should set header if set cookie in HEAD', (done) => {
       class Document {
         template () {
