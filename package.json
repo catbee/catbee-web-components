@@ -1,6 +1,6 @@
 {
   "name": "catbee-web-components",
-  "version": "1.0.0-rc.12",
+  "version": "1.0.0-rc.13",
   "description": "Catbee web components renderer",
   "main": "index.js",
   "scripts": {
