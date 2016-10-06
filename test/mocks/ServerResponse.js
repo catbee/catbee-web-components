@@ -1,4 +1,4 @@
-var Writable = require('stream').Writable;
+const Writable = require('stream').Writable;
 
 class ServerResponse extends Writable {
   constructor () {
