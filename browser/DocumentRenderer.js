@@ -570,7 +570,7 @@ class DocumentRenderer {
         }
 
         const collectorNode = slot.cloneNode(true);
-        const collectorTreeWalker = this._window.document.createTreeWalker(collectorNode, NodeFilter.SHOW_ELEMENT, null, false);
+        const collectorTreeWalker = this._window.document.createTreeWalker(collectorNode, NodeFilter.SHOW_ALL, null, false);
         const nestedComponents = this._findNestedComponents(slot);
 
         // First-of-all we should attach correct parent id to all child components.
