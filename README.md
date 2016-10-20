@@ -1,5 +1,7 @@
 ## Catbee Web Components
 
+[![Build Status][travis-img]][travis-url]
+
 DocumentRenderer implementaion based on [Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components), spiced by [Appstate](https://github.com/catbee/appstate) and [Baobab](https://github.com/Yomguithereal/baobab) for state management. You can use it with any template engine (jade, handlebars, dust) and not worry about browser rendering because it uses [morphdom](https://github.com/patrick-steele-idem/morphdom) for partial DOM updates instead of full-page rerendering.
 
 ### Getting Started
@@ -239,3 +241,7 @@ __Core things:__
 - Components watch tree branches
 - State send updates to components when a branch was changed
 - Component rerenders when watched branches were changed
+
+
+[travis-img]: https://travis-ci.org/catbee/catbee-web-components.svg?branch=master
+[travis-url]: https://travis-ci.org/catbee/catbee-web-components
