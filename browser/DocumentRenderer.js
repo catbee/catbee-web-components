@@ -224,16 +224,19 @@ class DocumentRenderer {
                 }
 
                 let slotContent = slotContentTemplate.cloneNode(true);
-                let nestedComponents = this._findNestedComponents(slotContent);
-
-                nestedComponents.forEach((component) =>
-                  component.$parentId = this._localContextProvider.getParentById(id));
 
                 while (node.firstChild) {
                   node.removeChild(node.firstChild);
                 } // We should have clean content inside slot before add new elements
 
                 node.appendChild(slotContent);
+
+                let nestedComponents = this._findNestedComponents(node);
+
+                nestedComponents.forEach((component) => {
+                  component.$parentId = this._localContextProvider.getParentById(id);
+                });
+
                 return false;
               }
 
@@ -262,16 +265,19 @@ class DocumentRenderer {
                 }
 
                 let slotContent = slotContentTemplate.cloneNode(true);
-                let nestedComponents = this._findNestedComponents(slotContent);
-
-                nestedComponents.forEach((component) =>
-                  component.$parentId = this._localContextProvider.getParentById(id));
 
                 while (foundElement.firstChild) {
                   foundElement.removeChild(foundElement.firstChild);
                 } // We should have clean content inside slot before add new elements
 
                 foundElement.appendChild(slotContent);
+
+                let nestedComponents = this._findNestedComponents(foundElement);
+
+                nestedComponents.forEach((component) => {
+                  component.$parentId = this._localContextProvider.getParentById(id);
+                });
+
                 return false;
               }
 
