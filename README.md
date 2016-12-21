@@ -179,6 +179,7 @@ Every component's $context is extended with the following properties & methods:
 - __this.$context.getComponentByElement(domElement)__ – gets another component's object by its DOM element.
 - __this.$context.createComponent('tagName', descriptor, attributesObject)__ – creates a new component's instance and returns a promise of its DOM element.
 - __this.$context.collectGarbage()__ – collects all components which have been created using the createComponent('tagName', attributesObject) method and are not attached to the DOM at the moment.
+- __this.$context.forceUpdate()__ - rerender component. Client-side only. 
 
 ### Component Slots
 [Slots](https://github.com/w3c/webcomponents/blob/gh-pages/proposals/Slots-Proposal.md) it's part of W3C Web Components specification.
