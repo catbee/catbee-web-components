@@ -436,6 +436,7 @@ class DocumentRenderer {
     componentContext.signal = (actions, args) => this._stateManager.signal(actions, args);
     componentContext.props = localContext.props;
     componentContext.state = this._stateManager.tree;
+    componentContext.forceUpdate = () => this._eventBus.emit('componentStateChanged', id);
 
     componentContext.getWatcherData = () => {
       let watcher = this._componentWatchers[id];
@@ -959,7 +960,6 @@ class DocumentRenderer {
     var promises = renderingContext.roots.map(root => {
       const id = this._getId(root);
       renderingContext.rootIds[id] = true;
-
       return this.renderComponent(root, null, renderingContext);
     });
 
