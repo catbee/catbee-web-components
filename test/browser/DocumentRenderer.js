@@ -2214,6 +2214,72 @@ lab.experiment('browser/DocumentRenderer', () => {
       });
     });
 
+    lab.test('Should force update component', (done) => {
+      class Component1 {
+        constructor () {
+          this.isRerendered = false;
+        }
+
+        template () {
+          return `${ this.isRerendered ? '2' : '1' }`;
+        }
+
+        bind () {
+          if (this.isRerendered) {
+            return;
+          }
+
+          this.isRerendered = true;
+
+          setTimeout(() => {
+            this.$context.forceUpdate();
+          }, 25);
+        }
+      }
+
+      const component1 = {
+        constructor: Component1
+      };
+
+      const document = {
+        constructor: class Document {},
+        children: [
+          {
+            name: 'test1',
+            component: component1
+          }
+        ]
+      };
+
+      const html = `
+        <cat-test1></cat-test1>
+      `;
+
+      const locator = createLocator(document);
+      const eventBus = locator.resolve('eventBus');
+      eventBus.on('error', done);
+
+      jsdom.env({
+        html: html,
+        done: function (errors, window) {
+          locator.registerInstance('window', window);
+          const renderer = new DocumentRenderer(locator);
+
+          renderer.initWithState({
+            args: {}
+          })
+          .then(() => {
+            setTimeout(() => {
+              const element = window.document.querySelector('cat-test1');
+              assert.strictEqual(element.innerHTML, '2', 'Incorrect HTML');
+              done();
+            }, 30);
+          })
+          .catch(done);
+        }
+      });
+    });
+
     lab.test('Should do nothing if nothing changes', (done) => {
       const renders = [];
 
